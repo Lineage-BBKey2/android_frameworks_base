@@ -1523,6 +1523,9 @@ public final class PowerManagerService extends SystemService
                 Settings.System.SCREEN_BRIGHTNESS_MODE),
                 false, mSettingsObserver, UserHandle.USER_ALL);
         resolver.registerContentObserver(Settings.System.getUriFor(
+                Settings.System.SCREEN_BRIGHTNESS),
+                false, mSettingsObserver, UserHandle.USER_ALL);
+        resolver.registerContentObserver(Settings.System.getUriFor(
                 Settings.System.SCREEN_AUTO_BRIGHTNESS_ADJ),
                 false, mSettingsObserver, UserHandle.USER_ALL);
         resolver.registerContentObserver(Settings.Global.getUriFor(
@@ -3169,6 +3172,20 @@ public final class PowerManagerService extends SystemService
                     if (now < groupNextTimeout) {
                         groupUserActivitySummary = USER_ACTIVITY_SCREEN_BRIGHT;
                         if (wakefulness == WAKEFULNESS_AWAKE) {
+                            // Get current screen brightness to scale button/keyboard
+                            float screenBrightScale = 1.0f;
+                            try {
+                                int screenBrightInt = Settings.System.getIntForUser(
+                                        mContext.getContentResolver(),
+                                        Settings.System.SCREEN_BRIGHTNESS,
+                                        255,
+                                        UserHandle.USER_CURRENT);
+                                // Scale: brightness 0-255 maps to 0.1-1.0 for keys
+                                screenBrightScale = Math.max(0.1f, screenBrightInt / 255.0f);
+                            } catch (Exception e) {
+                                screenBrightScale = 1.0f;
+                            }
+
                             if (mButtonsLight != null) {
                                 float buttonBrightness = BRIGHTNESS_OFF_FLOAT;
                                 if (!mForceNavbar) {
@@ -3182,6 +3199,10 @@ public final class PowerManagerService extends SystemService
                                     } else if (isValidButtonBrightness(mButtonBrightness)) {
                                         buttonBrightness = mButtonBrightness;
                                     }
+                                }
+                                // Scale button brightness with screen brightness
+                                if (buttonBrightness > BRIGHTNESS_OFF_FLOAT) {
+                                    buttonBrightness *= screenBrightScale;
                                 }
 
                                 if (!mButtonLightOnKeypressOnly) {
@@ -3224,6 +3245,10 @@ public final class PowerManagerService extends SystemService
                                     }
                                 } else if (isValidKeyboardBrightness(mKeyboardBrightness)) {
                                     keyboardBrightness = mKeyboardBrightness;
+                                }
+                                // Scale keyboard brightness with screen brightness
+                                if (keyboardBrightness > BRIGHTNESS_OFF_FLOAT) {
+                                    keyboardBrightness *= screenBrightScale;
                                 }
                                 mKeyboardLight.setBrightness(mKeyboardVisible ?
                                         keyboardBrightness : BRIGHTNESS_OFF_FLOAT);
