@@ -28,6 +28,7 @@ import com.android.systemui.qs.tiles.ReadingModeTile
 import com.android.systemui.qs.tiles.SyncTile
 import com.android.systemui.qs.tiles.UsbTetherTile
 import com.android.systemui.qs.tiles.VpnTile
+import com.android.systemui.qs.tiles.TouchKeypadTile
 import com.android.systemui.qs.tiles.WifiTile
 
 import dagger.Binds
@@ -102,6 +103,12 @@ interface LineageModule {
     @IntoMap
     @StringKey(VpnTile.TILE_SPEC)
     fun bindVpnTile(vpnTile: VpnTile): QSTileImpl<*>
+
+    /** Inject TouchKeypadTile into tileMap in QSModule */
+    @Binds
+    @IntoMap
+    @StringKey(TouchKeypadTile.TILE_SPEC)
+    fun bindTouchKeypadTile(touchKeypadTile: TouchKeypadTile): QSTileImpl<*>
 
     /** Inject WifiTile into tileMap in QSModule */
     @Binds
