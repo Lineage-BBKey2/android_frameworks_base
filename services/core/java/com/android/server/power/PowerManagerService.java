@@ -1557,6 +1557,18 @@ public final class PowerManagerService extends SystemService
         resolver.registerContentObserver(LineageSettings.Secure.getUriFor(
                 LineageSettings.Secure.KEYBOARD_BRIGHTNESS),
                 false, mSettingsObserver, UserHandle.USER_ALL);
+        resolver.registerContentObserver(Settings.Secure.getUriFor(
+                "keyboard_brightness"),
+                false, mSettingsObserver, UserHandle.USER_ALL);
+        resolver.registerContentObserver(Settings.Secure.getUriFor(
+                "button_brightness"),
+                false, mSettingsObserver, UserHandle.USER_ALL);
+        resolver.registerContentObserver(Settings.Secure.getUriFor(
+                "button_backlight_timeout"),
+                false, mSettingsObserver, UserHandle.USER_ALL);
+        resolver.registerContentObserver(Settings.Secure.getUriFor(
+                "button_backlight_only_when_pressed"),
+                false, mSettingsObserver, UserHandle.USER_ALL);
         resolver.registerContentObserver(LineageSettings.System.getUriFor(
                 LineageSettings.System.FORCE_SHOW_NAVBAR),
                 false, mSettingsObserver, UserHandle.USER_ALL);
@@ -1700,15 +1712,31 @@ public final class PowerManagerService extends SystemService
         mButtonTimeout = LineageSettings.Secure.getIntForUser(resolver,
                 LineageSettings.Secure.BUTTON_BACKLIGHT_TIMEOUT,
                 DEFAULT_BUTTON_ON_DURATION, UserHandle.USER_CURRENT);
+        int btnTimeoutOverride = Settings.Secure.getIntForUser(resolver,
+                "button_backlight_timeout", -1, UserHandle.USER_CURRENT);
+        if (btnTimeoutOverride >= 0) mButtonTimeout = btnTimeoutOverride;
+
         mButtonBrightness = LineageSettings.Secure.getFloatForUser(resolver,
                 LineageSettings.Secure.BUTTON_BRIGHTNESS, mButtonBrightnessDefault,
                 UserHandle.USER_CURRENT);
+        // Override from Android Settings.Secure if set (for DeviceSettings app)
+        float btnBrightOverride = Settings.Secure.getFloatForUser(resolver,
+                "button_brightness", -1.0f, UserHandle.USER_CURRENT);
+        if (btnBrightOverride >= 0) mButtonBrightness = btnBrightOverride;
+
         mButtonLightOnKeypressOnly = LineageSettings.System.getIntForUser(resolver,
                 LineageSettings.System.BUTTON_BACKLIGHT_ONLY_WHEN_PRESSED,
                 0, UserHandle.USER_CURRENT) == 1;
+        int btnPressedOverride = Settings.Secure.getIntForUser(resolver,
+                "button_backlight_only_when_pressed", -1, UserHandle.USER_CURRENT);
+        if (btnPressedOverride >= 0) mButtonLightOnKeypressOnly = btnPressedOverride == 1;
         mKeyboardBrightness = LineageSettings.Secure.getFloatForUser(resolver,
                 LineageSettings.Secure.KEYBOARD_BRIGHTNESS, mKeyboardBrightnessDefault,
                 UserHandle.USER_CURRENT);
+        // Override from Android Settings.Secure if set (for DeviceSettings app)
+        float kbdBrightOverride = Settings.Secure.getFloatForUser(resolver,
+                "keyboard_brightness", -1.0f, UserHandle.USER_CURRENT);
+        if (kbdBrightOverride >= 0) mKeyboardBrightness = kbdBrightOverride;
 
         mForceNavbar = LineageSettings.System.getIntForUser(resolver,
                 LineageSettings.System.FORCE_SHOW_NAVBAR,
