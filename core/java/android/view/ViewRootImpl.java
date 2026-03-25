@@ -9008,12 +9008,12 @@ public final class ViewRootImpl implements ViewParent,
      * ACTION_SCROLL events, reproducing the retail firmware scrolling behavior.
      */
     final class SyntheticTouchKeypadHandler extends Handler {
-        private static final float SCROLL_FACTOR = 0.0130f;
+        private static final float SCROLL_FACTOR = 0.0117f;
         // Scale factor: OverScroller works in integer pixels, so we scale up
         // velocity by this amount to get sub-pixel precision from int deltas
         private static final float FLING_SCALE = 5.0f;
-        private static final float FLING_SCROLL_FACTOR = 0.009f / FLING_SCALE;
-        private static final float FLING_FRICTION = 0.018f;
+        private static final float FLING_SCROLL_FACTOR = 0.0081f / FLING_SCALE;
+        private static final float FLING_FRICTION = 0.0198f;
         private static final float FLING_MIN_VELOCITY = 50.0f;
         private static final float TOUCH_SLOP = 8.0f;
 
