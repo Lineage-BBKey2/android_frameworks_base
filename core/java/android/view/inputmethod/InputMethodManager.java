@@ -4288,7 +4288,7 @@ public final class InputMethodManager {
                 if (event instanceof KeyEvent) {
                     KeyEvent keyEvent = (KeyEvent)event;
                     if (keyEvent.getAction() == KeyEvent.ACTION_DOWN
-                            && keyEvent.getKeyCode() == KeyEvent.KEYCODE_SYM
+                            && keyEvent.getKeyCode() == KeyEvent.KEYCODE_ENTER && keyEvent.isAltPressed()
                             && keyEvent.getRepeatCount() == 0) {
                         showInputMethodPickerLocked();
                         return DISPATCH_HANDLED;
