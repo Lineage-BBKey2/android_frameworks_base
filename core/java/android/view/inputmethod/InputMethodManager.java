@@ -4287,11 +4287,35 @@ public final class InputMethodManager {
             if (isImeSessionAvailableLocked()) {
                 if (event instanceof KeyEvent) {
                     KeyEvent keyEvent = (KeyEvent)event;
-                    if (keyEvent.getAction() == KeyEvent.ACTION_DOWN
-                            && keyEvent.getKeyCode() == KeyEvent.KEYCODE_ENTER && keyEvent.isAltPressed()
-                            && keyEvent.getRepeatCount() == 0) {
-                        showInputMethodPickerLocked();
-                        return DISPATCH_HANDLED;
+                    if (keyEvent.getRepeatCount() == 0) {
+                        int mode = Settings.Secure.getInt(
+                                mCurRootView.mContext.getContentResolver(),
+                                Settings.Secure.IME_SWITCHER_SHORTCUT, 0);
+                        boolean isImeSwitchKey;
+                        switch (mode) {
+                            case 1:
+                                isImeSwitchKey = keyEvent.getKeyCode() == KeyEvent.KEYCODE_ENTER
+                                        && keyEvent.isAltPressed();
+                                break;
+                            case 2:
+                                isImeSwitchKey = keyEvent.getKeyCode() == KeyEvent.KEYCODE_SPACE
+                                        && keyEvent.isShiftPressed();
+                                break;
+                            case 3:
+                                isImeSwitchKey = keyEvent.getKeyCode() == KeyEvent.KEYCODE_CTRL_LEFT
+                                        || keyEvent.getKeyCode() == KeyEvent.KEYCODE_CTRL_RIGHT
+                                        || keyEvent.getKeyCode() == KeyEvent.KEYCODE_FUNCTION;
+                                break;
+                            default:
+                                isImeSwitchKey = keyEvent.getKeyCode() == KeyEvent.KEYCODE_SYM;
+                                break;
+                        }
+                        if (isImeSwitchKey) {
+                            if (keyEvent.getAction() == KeyEvent.ACTION_DOWN) {
+                                showInputMethodPickerLocked();
+                            }
+                            return DISPATCH_HANDLED;
+                        }
                     }
                 }
 

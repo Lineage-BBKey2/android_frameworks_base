@@ -8242,6 +8242,14 @@ public final class Settings {
         public static final String SHOW_IME_WITH_HARD_KEYBOARD = "show_ime_with_hard_keyboard";
 
         /**
+         * Which shortcut triggers the IME switcher picker.
+         * 0 = SYM key (default), 1 = Alt+Enter, 2 = Shift+Space, 3 = Ctrl key
+         * @hide
+         */
+        @Readable
+        public static final String IME_SWITCHER_SHORTCUT = "ime_switcher_shortcut";
+
+        /**
          * Whether to enable bounce keys for Physical Keyboard accessibility.
          *
          * If set to non-zero value, any key press on physical keyboard within the provided
@@ -12951,6 +12959,7 @@ public final class Settings {
             CLONE_TO_MANAGED_PROFILE.add(ACCESSIBILITY_STICKY_KEYS);
             CLONE_TO_MANAGED_PROFILE.add(NOTIFICATION_BUBBLES);
             CLONE_TO_MANAGED_PROFILE.add(NOTIFICATION_HISTORY_ENABLED);
+            CLONE_TO_MANAGED_PROFILE.add(IME_SWITCHER_SHORTCUT);
         }
 
         /** @hide */
