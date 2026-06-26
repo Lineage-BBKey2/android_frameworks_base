@@ -8243,7 +8243,7 @@ public final class Settings {
 
         /**
          * Which shortcut triggers the IME switcher picker.
-         * 0 = SYM key (default), 1 = Alt+Enter, 2 = Shift+Space, 3 = Ctrl key
+         * 0 = Alt+Enter (default), 1 = Shift+Space 2 = Ctrl key, 3 = SYM key
          * @hide
          */
         @Readable
