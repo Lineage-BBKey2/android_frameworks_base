@@ -4294,20 +4294,20 @@ public final class InputMethodManager {
                         boolean isImeSwitchKey;
                         switch (mode) {
                             case 1:
-                                isImeSwitchKey = keyEvent.getKeyCode() == KeyEvent.KEYCODE_ENTER
-                                        && keyEvent.isAltPressed();
-                                break;
-                            case 2:
                                 isImeSwitchKey = keyEvent.getKeyCode() == KeyEvent.KEYCODE_SPACE
                                         && keyEvent.isShiftPressed();
                                 break;
-                            case 3:
+                            case 2:
                                 isImeSwitchKey = keyEvent.getKeyCode() == KeyEvent.KEYCODE_CTRL_LEFT
                                         || keyEvent.getKeyCode() == KeyEvent.KEYCODE_CTRL_RIGHT
                                         || keyEvent.getKeyCode() == KeyEvent.KEYCODE_FUNCTION;
                                 break;
-                            default:
+                            case 3:
                                 isImeSwitchKey = keyEvent.getKeyCode() == KeyEvent.KEYCODE_SYM;
+                                break;
+                            default:
+                                isImeSwitchKey = keyEvent.getKeyCode() == KeyEvent.KEYCODE_ENTER
+                                        && keyEvent.isAltPressed();
                                 break;
                         }
                         if (isImeSwitchKey) {
