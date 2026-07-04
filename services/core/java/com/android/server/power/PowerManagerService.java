@@ -3173,17 +3173,26 @@ public final class PowerManagerService extends SystemService
                         groupUserActivitySummary = USER_ACTIVITY_SCREEN_BRIGHT;
                         if (wakefulness == WAKEFULNESS_AWAKE) {
                             // Get current screen brightness to scale button/keyboard
-                            float screenBrightScale = 1.0f;
+                            float buttonBrightScale = 1.0f;
+                            float keyboardBrightScale = 1.0f;
                             try {
                                 int screenBrightInt = Settings.System.getIntForUser(
                                         mContext.getContentResolver(),
                                         Settings.System.SCREEN_BRIGHTNESS,
                                         255,
                                         UserHandle.USER_CURRENT);
-                                // Scale: brightness 0-255 maps to 0.1-1.0 for keys
-                                screenBrightScale = Math.max(0.1f, screenBrightInt / 255.0f);
+                                // Scale: brightness 0-255 maps to 0.1-1.0 for buttons
+                                buttonBrightScale = Math.max(0.1f, screenBrightInt / 255.0f);
+                                // Smooth scaling curve customized for Luna's dimmer keyboard backlight
+                                // Sets a 50% absolute minimum brightness floor when screen is at 0
+                                float minKbScale = 0.5f; 
+                                keyboardBrightScale = 
+                                        minKbScale + ((1.0f - minKbScale) * (screenBrightInt / 255.0f));
+                                keyboardBrightScale = 
+                                        Math.max(minKbScale, Math.min(1.0f, keyboardBrightScale));
                             } catch (Exception e) {
-                                screenBrightScale = 1.0f;
+                                buttonBrightScale = 1.0f;
+                                keyboardBrightScale = 1.0f;
                             }
 
                             if (mButtonsLight != null) {
@@ -3202,7 +3211,7 @@ public final class PowerManagerService extends SystemService
                                 }
                                 // Scale button brightness with screen brightness
                                 if (buttonBrightness > BRIGHTNESS_OFF_FLOAT) {
-                                    buttonBrightness *= screenBrightScale;
+                                    buttonBrightness *= buttonBrightScale;
                                 }
 
                                 if (!mButtonLightOnKeypressOnly) {
@@ -3248,7 +3257,7 @@ public final class PowerManagerService extends SystemService
                                 }
                                 // Scale keyboard brightness with screen brightness
                                 if (keyboardBrightness > BRIGHTNESS_OFF_FLOAT) {
-                                    keyboardBrightness *= screenBrightScale;
+                                    keyboardBrightness *= keyboardBrightScale;
                                 }
                                 mKeyboardLight.setBrightness(mKeyboardVisible ?
                                         keyboardBrightness : BRIGHTNESS_OFF_FLOAT);
