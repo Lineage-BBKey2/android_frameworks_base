@@ -1143,12 +1143,23 @@ public class DomainVerificationService extends SystemService
             applyPreVerifiedState(pkgState.getStateMap(), autoVerifyDomains, preVerifiedDomains);
         }
 
-        synchronized (mLock) {
-            mAttachedPkgStates.put(pkgName, domainSetId, pkgState);
+        // Auto-approve all auto-verify domains (no verification agent needed)
+        if (hasAutoVerifyDomains) {
+            ArrayMap<String, Integer> stateMap = pkgState.getStateMap();
+            int domainsSize = autoVerifyDomains.size();
+            for (int index = 0; index < domainsSize; index++) {
+                String domain = autoVerifyDomains.valueAt(index);
+                Integer current = stateMap.get(domain);
+                if (current == null
+                        || current == DomainVerificationState.STATE_NO_RESPONSE
+                        || current == DomainVerificationState.STATE_LEGACY_FAILURE) {
+                    stateMap.put(domain, DomainVerificationState.STATE_SUCCESS);
+                }
+            }
         }
 
-        if (sendBroadcast && hasAutoVerifyDomains) {
-            sendBroadcast(pkgName);
+        synchronized (mLock) {
+            mAttachedPkgStates.put(pkgName, domainSetId, pkgState);
         }
     }
 
@@ -1437,14 +1448,22 @@ public class DomainVerificationService extends SystemService
     }
 
     private void sendBroadcast(@NonNull Set<String> packageNames) {
-        if (!mCanSendBroadcasts) {
-            // If the system cannot send broadcasts, it's probably still in boot, so dropping this
-            // request should be fine. The verification agent should re-scan packages once boot
-            // completes.
-            return;
+        // Auto-approve all domains for all packages (no verification agent needed)
+        synchronized (mLock) {
+            for (String pkgName : packageNames) {
+                DomainVerificationPkgState pkgState = mAttachedPkgStates.get(pkgName);
+                if (pkgState != null) {
+                    ArrayMap<String, Integer> stateMap = pkgState.getStateMap();
+                    for (int i = 0; i < stateMap.size(); i++) {
+                        int state = stateMap.valueAt(i);
+                        if (state == DomainVerificationState.STATE_NO_RESPONSE
+                                || state == DomainVerificationState.STATE_LEGACY_FAILURE) {
+                            stateMap.setValueAt(i, DomainVerificationState.STATE_SUCCESS);
+                        }
+                    }
+                }
+            }
         }
-
-        mProxy.sendBroadcastForPackages(packageNames);
     }
 
     private boolean hasRealVerifier() {
