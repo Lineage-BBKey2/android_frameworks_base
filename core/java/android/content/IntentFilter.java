@@ -712,16 +712,16 @@ public class IntentFilter implements Parcelable {
 
         // Now allow only the schemes "http" and "https"
         final int N = mDataSchemes.size();
+        boolean hasWebScheme = false;
         for (int i = 0; i < N; i++) {
             final String scheme = mDataSchemes.get(i);
             final boolean isWebScheme =
                     SCHEME_HTTP.equals(scheme) || SCHEME_HTTPS.equals(scheme);
             if (onlyWebSchemes) {
-                // If we're specifically trying to ensure that there are no non-web schemes
-                // declared in this filter, then if we ever see a non-http/https scheme then
-                // we know it's a failure.
-                if (!isWebScheme) {
-                    return false;
+                // Allow mixed schemes - if filter has both web and non-web schemes,
+                // still consider it a web URI handler for domain verification
+                if (isWebScheme) {
+                    hasWebScheme = true;
                 }
             } else {
                 // If we see any http/https scheme declaration in this case then the
@@ -732,10 +732,7 @@ public class IntentFilter implements Parcelable {
             }
         }
 
-        // We get here if:
-        //   1) onlyWebSchemes and no non-web schemes were found, i.e. success; or
-        //   2) !onlyWebSchemes and no http/https schemes were found, i.e. failure.
-        return onlyWebSchemes;
+        return onlyWebSchemes && hasWebScheme;
     }
 
     /**
