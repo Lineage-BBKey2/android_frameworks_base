@@ -3181,15 +3181,24 @@ public final class PowerManagerService extends SystemService
                                         Settings.System.SCREEN_BRIGHTNESS,
                                         255,
                                         UserHandle.USER_CURRENT);
-                                // Scale: brightness 0-255 maps to 0.1-1.0 for buttons
+                                // Nav Button Scale: brightness 0-255 maps to 0.1-1.0
                                 buttonBrightScale = Math.max(0.1f, screenBrightInt / 255.0f);
-                                // Smooth scaling curve customized for Luna's dimmer keyboard backlight
-                                // Sets a 50% absolute minimum brightness floor when screen is at 0
-                                float minKbScale = 0.5f; 
-                                keyboardBrightScale = 
+                                // Keyboard Scale
+                                if (screenBrightInt <= 0) {
+                                    keyboardBrightScale = 0.0f;
+                                } else if (screenBrightInt < 50) {
+                                    // Smooth scaling curve for Luna's dimmer keyboard backlight
+                                    // Sets a 70% minimum brightness floor when screen approaches 0
+                                    // User can further reduce KB brightness in BB Keyboard Settings
+                                    float minKbScale = 0.7f;
+                                    keyboardBrightScale = 
                                         minKbScale + ((1.0f - minKbScale) * (screenBrightInt / 255.0f));
-                                keyboardBrightScale = 
+                                    keyboardBrightScale = 
                                         Math.max(minKbScale, Math.min(1.0f, keyboardBrightScale));
+                                } else {
+                                    // Bright (daylight): kbd off
+                                    keyboardBrightScale = 0.0f;
+                                }
                             } catch (Exception e) {
                                 buttonBrightScale = 1.0f;
                                 keyboardBrightScale = 1.0f;
@@ -3255,7 +3264,7 @@ public final class PowerManagerService extends SystemService
                                 } else if (isValidKeyboardBrightness(mKeyboardBrightness)) {
                                     keyboardBrightness = mKeyboardBrightness;
                                 }
-                                // Scale keyboard brightness with screen brightness
+                                // Scale keyboard brightness with screen brightness (off in daylight)
                                 if (keyboardBrightness > BRIGHTNESS_OFF_FLOAT) {
                                     keyboardBrightness *= keyboardBrightScale;
                                 }
