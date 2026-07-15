@@ -1189,6 +1189,11 @@ public class AudioDeviceBroker {
                     AudioSystem.setParameters("A2dpSuspended=true");
                 } else {
                     AudioSystem.setParameters("A2dpSuspended=false");
+                    // Force audio policy to re-route media streams back to A2DP.
+                    // Without this, streams stay on the primary output (SCO) after
+                    // a call ends because audio policy doesn't proactively move them.
+                    AudioSystem.setForceUse(AudioSystem.FOR_MEDIA,
+                            AudioSystem.FORCE_NONE);
                 }
             }
             if ((mBluetoothLeSuspendedExt || mBluetoothLeSuspendedInt)
