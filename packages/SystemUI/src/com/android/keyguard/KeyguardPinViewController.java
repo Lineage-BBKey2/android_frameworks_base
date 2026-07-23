@@ -36,8 +36,52 @@ import com.android.systemui.user.domain.interactor.SelectedUserInteractor;
 
 import lineageos.providers.LineageSettings;
 
+import android.provider.Settings;
+import android.view.KeyEvent;
+
 public class KeyguardPinViewController
         extends KeyguardPinBasedInputViewController<KeyguardPINView> {
+    // --- Key2 Keyboard PIN Tweak ---
+    private static volatile KeyguardPinViewController sActiveInstance;
+
+    public static KeyguardPinViewController getActiveInstance() {
+        return sActiveInstance;
+    }
+
+    /** Called directly from the window-level dispatchKeyEvent. */
+    public boolean handleHardwareKeyCode(int keyCode) {
+        boolean pinInputEnabled = Settings.Secure.getInt(
+                getContext().getContentResolver(), "keyboard_pin_input", 1) == 1;
+        if (!pinInputEnabled) {
+            return false;
+        }
+        int viewId = mapKey2Pin(keyCode);
+        if (viewId == -1) {
+            return false;
+        }
+        View keyView = mView.findViewById(viewId);
+        if (keyView == null) {
+            return false;
+        }
+        onUserInput();
+        keyView.performClick();
+        return true;
+    }
+
+    private final KeyguardUpdateMonitorCallback mUpdateMonitorCallback = new KeyguardUpdateMonitorCallback() {
+        @Override
+        public void onKeyguardVisibilityChanged(boolean showing) {
+            // Because the bouncer stays permanently attached/hidden instead of going through its
+            // normal show/dismiss lifecycle, reset() (which clears mDismissing and stale PIN text)
+            // never fires on its own after a hardware-keyboard unlock. Do it explicitly here,
+            // once per new lock session.
+            if (showing) {
+                KeyguardPinViewController.this.reset();
+            }
+    }
+};
+    // --- End Key2 Keyboard PIN Tweak ---
+
     private final KeyguardUpdateMonitor mKeyguardUpdateMonitor;
     private final DevicePostureController mPostureController;
     private final DevicePostureController.Callback mPostureCallback = posture ->
@@ -84,7 +128,8 @@ public class KeyguardPinViewController
     @Override
     protected void onViewAttached() {
         super.onViewAttached();
-
+        sActiveInstance = this; // --- Key2 Keyboard PIN Tweak ---
+        mKeyguardUpdateMonitor.registerCallback(mUpdateMonitorCallback); // --- Key2 Keyboard PIN Tweak ---
         View cancelBtn = mView.findViewById(R.id.cancel_button);
         if (cancelBtn != null) {
             cancelBtn.setOnClickListener(view -> {
@@ -121,6 +166,8 @@ public class KeyguardPinViewController
     protected void onViewDetached() {
         super.onViewDetached();
         mPostureController.removeCallback(mPostureCallback);
+        if (sActiveInstance == this) sActiveInstance = null; // --- Key2 Keyboard PIN Tweak ---
+        mKeyguardUpdateMonitor.removeCallback(mUpdateMonitorCallback); // --- Key2 Keyboard PIN Tweak ---
     }
 
     @Override
@@ -222,4 +269,26 @@ public class KeyguardPinViewController
             return mId;
         }
     }
+
+    /** Key2 Keyboard PIN Tweak - Map physical keyboard keycodes to numbers */
+    private int mapKey2Pin(int keyCode) {
+        switch (keyCode) {
+            case KeyEvent.KEYCODE_W: return R.id.key1;
+            case KeyEvent.KEYCODE_E: return R.id.key2;
+            case KeyEvent.KEYCODE_R: return R.id.key3;
+            case KeyEvent.KEYCODE_S: return R.id.key4;
+            case KeyEvent.KEYCODE_D: return R.id.key5;
+            case KeyEvent.KEYCODE_F: return R.id.key6;
+            case KeyEvent.KEYCODE_Z: return R.id.key7;
+            case KeyEvent.KEYCODE_X: return R.id.key8;
+            case KeyEvent.KEYCODE_C: return R.id.key9;
+            case KeyEvent.KEYCODE_0: return R.id.key0;
+            case KeyEvent.KEYCODE_Q: return R.id.key0;
+            case KeyEvent.KEYCODE_DEL: return R.id.delete_button;
+            case KeyEvent.KEYCODE_ENTER: return R.id.key_enter;
+            default: return -1;
+        }
+    }
+
+
 }
