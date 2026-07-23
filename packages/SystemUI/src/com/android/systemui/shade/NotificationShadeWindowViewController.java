@@ -34,6 +34,7 @@ import androidx.core.view.ViewKt;
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.keyguard.AuthKeyguardMessageArea;
 import com.android.keyguard.KeyguardUnfoldTransition;
+import com.android.keyguard.KeyguardPinViewController;
 import com.android.systemui.Dumpable;
 import com.android.systemui.animation.ActivityTransitionAnimator;
 import com.android.systemui.bouncer.domain.interactor.AlternateBouncerInteractor;
@@ -272,12 +273,21 @@ public class NotificationShadeWindowViewController implements Dumpable {
         mBouncerParentView = mView.findViewById(R.id.keyguard_bouncer_container);
         bouncerViewBinder.bind(mBouncerParentView);
         if (ComposeBouncerFlags.INSTANCE.isOnlyComposeBouncerEnabled()) {
-            collectFlow(mView, mKeyguardTransitionInteractor.transition(
-                            new Edge.StateToState(KeyguardState.PRIMARY_BOUNCER, null)),
-                    this::onTransitionAwayFromBouncer);
-            collectFlow(mView, mKeyguardTransitionInteractor.transition(
-                            new Edge.StateToState(null, KeyguardState.PRIMARY_BOUNCER)),
-                    this::onTransitionToBouncer);
+            // --- Key2 Keyboard PIN Tweak: keep the bouncer (and KeyguardPinViewController) permanently
+            // attached so hardware keyboard PIN entry works even before swipe-up ---
+            if (mView.indexOfChild(mBouncerParentView) == -1) {
+                mView.addView(mBouncerParentView);
+            }
+            ViewKt.setVisible(mBouncerParentView, false);
+            // No longer add/remove the bouncer view on transition;
+            // visibility is handled by the isShowing() collector in bindBouncer() instead.
+            // collectFlow(mView, mKeyguardTransitionInteractor.transition(
+            //                 new Edge.StateToState(KeyguardState.PRIMARY_BOUNCER, null)),
+            //         this::onTransitionAwayFromBouncer);
+            // collectFlow(mView, mKeyguardTransitionInteractor.transition(
+            //                 new Edge.StateToState(null, KeyguardState.PRIMARY_BOUNCER)),
+            //         this::onTransitionToBouncer);
+            // --- End Key2 Keyboard PIN Tweak ---
             collectFlow(mView, mPrimaryBouncerInteractor.isShowing(),
                     (showing) -> ViewKt.setVisible(mBouncerParentView, showing));
         }
@@ -624,6 +634,16 @@ public class NotificationShadeWindowViewController implements Dumpable {
 
             @Override
             public boolean dispatchKeyEvent(KeyEvent event) {
+                // --- Key2 Keyboard PIN Tweak ---
+                if (event.getAction() == KeyEvent.ACTION_DOWN && event.getRepeatCount() == 0) {
+                    KeyguardPinViewController activePin = KeyguardPinViewController.getActiveInstance();
+                    if (activePin != null) {
+                        if (activePin.handleHardwareKeyCode(event.getKeyCode())) {
+                            return true; // consumed here
+                        }
+                    }
+                }
+                // --- End Key2 Keyboard PIN Tweak ---
                 return mSysUIKeyEventHandler.dispatchKeyEvent(event);
             }
 
