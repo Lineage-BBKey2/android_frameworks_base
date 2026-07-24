@@ -3197,10 +3197,9 @@ public final class PowerManagerService extends SystemService
                                 if (screenBrightInt <= 0) {
                                     keyboardBrightScale = 0.0f;
                                 } else if (screenBrightInt < 50) {
-                                    // Smooth scaling curve for Luna's dimmer keyboard backlight
-                                    // Sets a 70% minimum brightness floor when screen approaches 0
-                                    // User can further reduce KB brightness in BB Keyboard Settings
-                                    float minKbScale = 0.7f;
+                                    // Smooth scaling curve for Athena's keyboard backlight
+                                    // Sets a 10% minimum brightness floor when screen approaches 0
+                                    float minKbScale = 0.1f;
                                     keyboardBrightScale = 
                                         minKbScale + ((1.0f - minKbScale) * (screenBrightInt / 255.0f));
                                     keyboardBrightScale = 
