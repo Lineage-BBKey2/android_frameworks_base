@@ -3175,6 +3175,8 @@ public final class PowerManagerService extends SystemService
                             // Get current screen brightness to scale button/keyboard
                             float buttonBrightScale = 1.0f;
                             float keyboardBrightScale = 1.0f;
+                            boolean adaptiveButtonBrightness = true;
+                            boolean adaptiveKeyboardBrightness = true;
                             try {
                                 int screenBrightInt = Settings.System.getIntForUser(
                                         mContext.getContentResolver(),
@@ -3182,8 +3184,16 @@ public final class PowerManagerService extends SystemService
                                         255,
                                         UserHandle.USER_CURRENT);
                                 // Nav Button Scale: brightness 0-255 maps to 0.1-1.0
+                                adaptiveButtonBrightness = Settings.Secure.getIntForUser(
+                                        mContext.getContentResolver(),
+                                        "button_adaptive_brightness", 1, 
+                                        UserHandle.USER_CURRENT) == 1;                                
                                 buttonBrightScale = Math.max(0.1f, screenBrightInt / 255.0f);
                                 // Keyboard Scale
+                                adaptiveKeyboardBrightness = Settings.Secure.getIntForUser(
+                                        mContext.getContentResolver(),
+                                        "keyboard_adaptive_brightness", 1, 
+                                        UserHandle.USER_CURRENT) == 1;
                                 if (screenBrightInt <= 0) {
                                     keyboardBrightScale = 0.0f;
                                 } else if (screenBrightInt < 50) {
@@ -3219,7 +3229,8 @@ public final class PowerManagerService extends SystemService
                                     }
                                 }
                                 // Scale button brightness with screen brightness
-                                if (buttonBrightness > BRIGHTNESS_OFF_FLOAT) {
+                                // ONLY if toggle is enabled
+                                if (buttonBrightness > BRIGHTNESS_OFF_FLOAT && adaptiveButtonBrightness) {
                                     buttonBrightness *= buttonBrightScale;
                                 }
 
@@ -3265,7 +3276,8 @@ public final class PowerManagerService extends SystemService
                                     keyboardBrightness = mKeyboardBrightness;
                                 }
                                 // Scale keyboard brightness with screen brightness (off in daylight)
-                                if (keyboardBrightness > BRIGHTNESS_OFF_FLOAT) {
+                                // ONLY if toggle is enabled
+                                if (keyboardBrightness > BRIGHTNESS_OFF_FLOAT && adaptiveKeyboardBrightness) {
                                     keyboardBrightness *= keyboardBrightScale;
                                 }
                                 mKeyboardLight.setBrightness(mKeyboardVisible ?
