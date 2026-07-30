@@ -70,7 +70,14 @@ public class TouchKeypadTile extends QSTileImpl<BooleanState> {
 
     @Override
     public boolean isAvailable() {
-        return true;
+        // Only return true if device is Athena, since Luna does not have capacitive keyboard.
+        String device = android.os.SystemProperties.get("ro.product.device", "");
+        String sysName = android.os.SystemProperties.get("ro.product.system.name", "");
+        String linDev = android.os.SystemProperties.get("ro.lineage.device", "");
+        return "bbf100".equalsIgnoreCase(device)
+               || "athena".equalsIgnoreCase(device)
+               || "lineage_athena".equalsIgnoreCase(sysName)
+               || "athena".equalsIgnoreCase(linDev);
     }
 
     @Override

@@ -372,6 +372,22 @@ public final class PowerManagerService extends SystemService
 
     private boolean mButtonLightOnKeypressOnly;
 
+    // Lazy-loaded hardware identifier for device-specific adaptive backlight scaling
+    private Boolean mIsLuna = null;
+
+    private boolean isLunaDevice() {
+        if (mIsLuna == null) {
+            String device = android.os.SystemProperties.get("ro.product.device", "");
+            String sysName = android.os.SystemProperties.get("ro.product.system.name", "");
+            String linDev = android.os.SystemProperties.get("ro.lineage.device", "");
+            mIsLuna = "bbe100".equalsIgnoreCase(device)
+                    || "luna".equalsIgnoreCase(device)
+                    || "lineage_luna".equalsIgnoreCase(sysName)
+                    || "luna".equalsIgnoreCase(linDev);
+        }
+        return mIsLuna;
+    }
+
     private final InattentiveSleepWarningController mInattentiveSleepWarningOverlayController;
     private final AmbientDisplaySuppressionController mAmbientDisplaySuppressionController;
 
@@ -3197,9 +3213,9 @@ public final class PowerManagerService extends SystemService
                                 if (screenBrightInt <= 0) {
                                     keyboardBrightScale = 0.0f;
                                 } else if (screenBrightInt < 50) {
-                                    // Smooth scaling curve for Athena's keyboard backlight
-                                    // Sets a 10% minimum brightness floor when screen approaches 0
-                                    float minKbScale = 0.1f;
+                                    // Smooth scaling curve for keyboard backlight
+                                    // 10% floor for Athena, 70% floor for Luna (Luna has dimmer backlight)
+                                    float minKbScale = isLunaDevice() ? 0.7f : 0.1f;
                                     keyboardBrightScale = 
                                         minKbScale + ((1.0f - minKbScale) * (screenBrightInt / 255.0f));
                                     keyboardBrightScale = 
