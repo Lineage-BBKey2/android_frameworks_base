@@ -3199,12 +3199,12 @@ public final class PowerManagerService extends SystemService
                                         Settings.System.SCREEN_BRIGHTNESS,
                                         255,
                                         UserHandle.USER_CURRENT);
-                                // Nav Button Scale: brightness 0-255 maps to 0.1-1.0
+                                // Nav Button Scale: brightness 0-255 maps to 0.01-1.0
                                 adaptiveButtonBrightness = Settings.Secure.getIntForUser(
                                         mContext.getContentResolver(),
                                         "button_adaptive_brightness", 1, 
                                         UserHandle.USER_CURRENT) == 1;                                
-                                buttonBrightScale = Math.max(0.1f, screenBrightInt / 255.0f);
+                                buttonBrightScale = Math.max(0.01f, screenBrightInt / 255.0f);
                                 // Keyboard Scale
                                 adaptiveKeyboardBrightness = Settings.Secure.getIntForUser(
                                         mContext.getContentResolver(),
@@ -3212,7 +3212,7 @@ public final class PowerManagerService extends SystemService
                                         UserHandle.USER_CURRENT) == 1;
                                 if (screenBrightInt <= 0) {
                                     keyboardBrightScale = 0.0f;
-                                } else if (screenBrightInt < 50) {
+                                } else if (screenBrightInt < 100) {
                                     // Smooth scaling curve for keyboard backlight
                                     // 10% floor for Athena, 70% floor for Luna (Luna has dimmer backlight)
                                     float minKbScale = isLunaDevice() ? 0.7f : 0.1f;
