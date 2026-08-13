@@ -5773,6 +5773,18 @@ public class PhoneWindowManager implements WindowManagerPolicy {
     public int interceptKeyBeforeQueueing(KeyEvent event, int policyFlags) {
         final int keyCode = event.getKeyCode();
         final boolean down = event.getAction() == KeyEvent.ACTION_DOWN;
+        if (down) {
+            if (keyCode == KeyEvent.KEYCODE_BACK || keyCode == KeyEvent.KEYCODE_HOME ||
+                    keyCode == KeyEvent.KEYCODE_APP_SWITCH) {
+                mPowerManagerInternal.notifyKeyPressed(false /* isKeyboardKey */);
+            } else if (!KeyEvent.isSystemKey(keyCode)) {
+                final InputDevice inputDevice = event.getDevice();
+                if (inputDevice != null && inputDevice.getKeyboardType()
+                        == InputDevice.KEYBOARD_TYPE_ALPHABETIC) {
+                    mPowerManagerInternal.notifyKeyPressed(true /* isKeyboardKey */);
+                }
+            }
+        }
         boolean isWakeKey = (policyFlags & WindowManagerPolicy.FLAG_WAKE) != 0
                 || event.isWakeKey();
         boolean isKeyGestureTriggered = (policyFlags & FLAG_KEY_GESTURE_TRIGGERED) != 0;

@@ -125,6 +125,16 @@ public abstract class PowerManagerInternal {
     public abstract void setUserInactiveOverrideFromWindowManager();
 
     /**
+     * Used by the window manager to tell the power manager that the user pressed a physical
+     * key, so the button and keyboard backlights can be controlled independently based on
+     * which one was actually pressed.
+     *
+     * @param isKeyboardKey true if the key came from the device's physical keyboard,
+     *                       false if it came from a capacitive/hardware navigation button.
+     */
+    public abstract void notifyKeyPressed(boolean isKeyboardKey);
+
+    /**
      * Used by device administration to set the maximum screen off timeout.
      *
      * This method must only be called by the device administration policy manager.
