@@ -1,0 +1,45 @@
+<!--
+    Copyright (C) 2026 The LineageOS Project
+    SPDX-License-Identifier: Apache-2.0
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+
+    <!-- Keyboard frame -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="1.05"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M3.75,5.75H20.25C21.08,5.75 21.75,6.42 21.75,7.25V16.75C21.75,17.58 21.08,18.25 20.25,18.25H3.75C2.92,18.25 2.25,17.58 2.25,16.75V7.25C2.25,6.42 2.92,5.75 3.75,5.75Z" />
+
+    <!-- Top key row -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M5,8.55h2v1.5H5v-1.5zM8,8.55h2v1.5H8v-1.5zM11,8.55h2v1.5h-2v-1.5zM14,8.55h2v1.5h-2v-1.5zM17,8.55h2v1.5h-2v-1.5z" />
+
+    <!-- Middle key row -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M5,11.25h2v1.5H5v-1.5zM8,11.25h2v1.5H8v-1.5zM11,11.25h2v1.5h-2v-1.5zM14,11.25h2v1.5h-2v-1.5zM17,11.25h2v1.5h-2v-1.5z" />
+
+    <!-- Bottom row: one key, three-key-wide spacebar, one key -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M5,13.95h2v1.5H5v-1.5zM8,13.95h8v1.5H8v-1.5zM17,13.95h2v1.5h-2v-1.5z" />
+
+    <!-- Full-height centered two-way scrolling arrow -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M12,0.1L16.7,4.5H7.3ZM11.5,4.15H12.5V19.85H11.5ZM7.3,19.5H16.7L12,23.9Z" />
+
+    <!-- Disabled slash -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M2.81,2.81L1.39,4.22L19.78,22.61L21.19,21.2Z" />
+
+</vector>
