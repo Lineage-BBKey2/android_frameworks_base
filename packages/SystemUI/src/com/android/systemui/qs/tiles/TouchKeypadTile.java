@@ -17,9 +17,11 @@
 package com.android.systemui.qs.tiles;
 
 import android.content.Intent;
+import android.database.ContentObserver;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.SystemProperties;
+import android.provider.Settings;
 import android.service.quicksettings.Tile;
 
 import androidx.annotation.Nullable;
@@ -46,7 +48,15 @@ public class TouchKeypadTile extends QSTileImpl<BooleanState> {
 
     public static final String TILE_SPEC = "touchkeypad";
 
-    private static final String PROP_DISABLED = "persist.vendor.touchkeypad.disabled";
+    private static final String PROP_SCROLLING_DISABLED =
+            "persist.vendor.touchkeypad.scrolling_disabled";
+    private static final String PROP_TOUCHPAD_POWER_DISABLED =
+            "persist.vendor.touchkeypad.disabled";
+    private static final String SETTING_TOUCHPAD_ENABLED =
+            "keyboard_touchpad_enabled";
+
+    private final ContentObserver mTouchpadPowerObserver;
+    private boolean mTouchpadPowerObserverRegistered;
 
     @Inject
     public TouchKeypadTile(
@@ -62,10 +72,23 @@ public class TouchKeypadTile extends QSTileImpl<BooleanState> {
     ) {
         super(host, uiEventLogger, backgroundLooper, mainHandler, falsingManager, metricsLogger,
                 statusBarStateController, activityStarter, qsLogger);
+
+        // Use the tile's worker handler so post-boot SystemUI main-thread
+        // activity does not unnecessarily delay the tile refresh.
+        mTouchpadPowerObserver = new ContentObserver(mHandler) {
+            @Override
+            public void onChange(boolean selfChange) {
+                refreshState();
+            }
+        };
     }
 
-    private boolean isEnabled() {
-        return !"1".equals(SystemProperties.get(PROP_DISABLED, "0"));
+    private boolean isScrollingEnabled() {
+        return !"1".equals(SystemProperties.get(PROP_SCROLLING_DISABLED, "0"));
+    }
+
+    private boolean isTouchpadPowered() {
+        return !SystemProperties.getBoolean(PROP_TOUCHPAD_POWER_DISABLED, false);
     }
 
     @Override
@@ -83,20 +106,28 @@ public class TouchKeypadTile extends QSTileImpl<BooleanState> {
     @Override
     public BooleanState newTileState() {
         BooleanState state = new BooleanState();
-        state.handlesLongClick = false;
+        state.handlesLongClick = true;
         return state;
     }
 
     @Override
     public void handleClick(@Nullable Expandable expandable) {
-        boolean newEnabled = !isEnabled();
-        SystemProperties.set(PROP_DISABLED, newEnabled ? "0" : "1");
+        // The scrolling setting cannot be changed while the capacitive
+        // keyboard hardware is powered off.
+        if (!isTouchpadPowered()) {
+            return;
+        }
+
+        boolean newEnabled = !isScrollingEnabled();
+        SystemProperties.set(PROP_SCROLLING_DISABLED, newEnabled ? "0" : "1");
         refreshState();
     }
 
     @Override
     public Intent getLongClickIntent() {
-        return null;
+        return new Intent().setClassName(
+                "com.blackberry.settings",
+                "com.blackberry.settings.DeviceSettingsActivity");
     }
 
     @Override
@@ -106,11 +137,31 @@ public class TouchKeypadTile extends QSTileImpl<BooleanState> {
 
     @Override
     protected void handleUpdateState(BooleanState state, Object arg) {
-        state.icon = ResourceIcon.get(R.drawable.ic_qs_touchkeypad);
-        state.hasLongClickEffect = false;
-        state.value = isEnabled();
-        state.state = state.value ? Tile.STATE_ACTIVE : Tile.STATE_INACTIVE;
+        final boolean touchpadPowered = isTouchpadPowered();
+        final boolean scrollingEnabled = isScrollingEnabled();
+
+        state.icon = ResourceIcon.get(touchpadPowered
+                ? R.drawable.ic_qs_touchkeypad
+                : R.drawable.ic_qs_touchkeypad_unavailable);
+        state.hasLongClickEffect = true;
+        state.value = touchpadPowered && scrollingEnabled;
         state.label = mContext.getString(R.string.quick_settings_touchkeypad_label);
+        state.contentDescription = state.label;
+
+        if (!touchpadPowered) {
+            state.state = Tile.STATE_UNAVAILABLE;
+            state.secondaryLabel = mContext.getString(
+                    R.string.quick_settings_touchkeypad_unavailable);
+            state.stateDescription = state.secondaryLabel;
+        } else {
+            state.state = scrollingEnabled
+                    ? Tile.STATE_ACTIVE
+                    : Tile.STATE_INACTIVE;
+            state.secondaryLabel = null;
+            state.stateDescription = state.state == Tile.STATE_INACTIVE
+                    ? ""
+                    : null;
+        }
     }
 
     @Override
@@ -120,5 +171,23 @@ public class TouchKeypadTile extends QSTileImpl<BooleanState> {
 
     @Override
     public void handleSetListening(boolean listening) {
+        super.handleSetListening(listening);
+
+        if (listening && !mTouchpadPowerObserverRegistered) {
+            mContext.getContentResolver().registerContentObserver(
+                    Settings.Global.getUriFor(SETTING_TOUCHPAD_ENABLED),
+                    false,
+                    mTouchpadPowerObserver);
+            mTouchpadPowerObserverRegistered = true;
+        } else if (!listening && mTouchpadPowerObserverRegistered) {
+            mContext.getContentResolver().unregisterContentObserver(
+                    mTouchpadPowerObserver);
+            mTouchpadPowerObserverRegistered = false;
+        }
+
+        if (listening) {
+            // Also cover changes made while the tile was not listening.
+            refreshState();
+        }
     }
 }

@@ -373,6 +373,8 @@ public final class PowerManagerService extends SystemService
 
     private boolean mButtonLightOnKeypressOnly;
     private boolean mKeyboardLightOnKeypressOnly;
+    private boolean mKeyboardLightOnTouch;
+    private boolean mButtonLightOnKeyboardTouch;
 
     // Lazy-loaded hardware identifier for device-specific adaptive backlight scaling
     private Boolean mIsLuna = null;
@@ -1614,10 +1616,16 @@ public final class PowerManagerService extends SystemService
                 "button_backlight_only_when_pressed"),
                 false, mSettingsObserver, UserHandle.USER_ALL);
         resolver.registerContentObserver(Settings.Secure.getUriFor(
+                "button_backlight_on_keyboard_touch"),
+                false, mSettingsObserver, UserHandle.USER_ALL);
+        resolver.registerContentObserver(Settings.Secure.getUriFor(
                 "keyboard_backlight_timeout"),
                 false, mSettingsObserver, UserHandle.USER_ALL);
         resolver.registerContentObserver(Settings.Secure.getUriFor(
                 "keyboard_backlight_only_when_pressed"),
+                false, mSettingsObserver, UserHandle.USER_ALL);
+        resolver.registerContentObserver(Settings.Secure.getUriFor(
+                "keyboard_backlight_on_touch"),
                 false, mSettingsObserver, UserHandle.USER_ALL);
         resolver.registerContentObserver(LineageSettings.System.getUriFor(
                 LineageSettings.System.FORCE_SHOW_NAVBAR),
@@ -1780,11 +1788,17 @@ public final class PowerManagerService extends SystemService
         int btnPressedOverride = Settings.Secure.getIntForUser(resolver,
                 "button_backlight_only_when_pressed", -1, UserHandle.USER_CURRENT);
         if (btnPressedOverride >= 0) mButtonLightOnKeypressOnly = btnPressedOverride == 1;
+        mButtonLightOnKeyboardTouch = Settings.Secure.getIntForUser(resolver,
+                "button_backlight_on_keyboard_touch", 0,
+                UserHandle.USER_CURRENT) == 1;
         mKeyboardTimeout = Settings.Secure.getIntForUser(resolver,
                 "keyboard_backlight_timeout", 0, UserHandle.USER_CURRENT);
         int kbdPressedOverride = Settings.Secure.getIntForUser(resolver,
                 "keyboard_backlight_only_when_pressed", -1, UserHandle.USER_CURRENT);
         if (kbdPressedOverride >= 0) mKeyboardLightOnKeypressOnly = kbdPressedOverride == 1;
+        mKeyboardLightOnTouch = Settings.Secure.getIntForUser(resolver,
+                "keyboard_backlight_on_touch", 0,
+                UserHandle.USER_CURRENT) == 1;
         mKeyboardBrightness = LineageSettings.Secure.getFloatForUser(resolver,
                 LineageSettings.Secure.KEYBOARD_BRIGHTNESS, mKeyboardBrightnessDefault,
                 UserHandle.USER_CURRENT);
@@ -2260,6 +2274,58 @@ public final class PowerManagerService extends SystemService
     private void userActivityFromNative(long eventTime, @PowerManager.UserActivityEvent int event,
             int displayId, int flags) {
         userActivityInternal(displayId, eventTime, event, flags, Process.SYSTEM_UID);
+    }
+
+    // Called from native input dispatch for SOURCE_TOUCHPAD motion.
+    @SuppressWarnings("unused")
+    private void touchpadActivityFromNative(long eventTime) {
+        synchronized (mLock) {
+            final boolean lightKeyboard =
+                    mKeyboardLightOnKeypressOnly
+                            && mKeyboardLightOnTouch
+                            && mKeyboardLight != null;
+
+            final boolean lightButtons =
+                    mButtonLightOnKeypressOnly
+                            && mButtonLightOnKeyboardTouch
+                            && mButtonsLight != null;
+
+            if (!lightKeyboard && !lightButtons) {
+                return;
+            }
+
+            final PowerGroup powerGroup =
+                    mPowerGroups.get(Display.DEFAULT_DISPLAY_GROUP);
+            if (powerGroup == null
+                    || powerGroup.getWakefulnessLocked() != WAKEFULNESS_AWAKE) {
+                return;
+            }
+
+            boolean changed = false;
+
+            if (lightKeyboard
+                    && eventTime
+                            > powerGroup.getLastKeyboardActivityTimeLocked()) {
+                powerGroup.setKeyboardPressedLocked(true);
+                powerGroup.setLastKeyboardActivityTimeLocked(eventTime);
+                changed = true;
+            }
+
+            if (lightButtons
+                    && eventTime
+                            > powerGroup.getLastButtonActivityTimeLocked()) {
+                powerGroup.setButtonPressedLocked(true);
+                powerGroup.setLastButtonActivityTimeLocked(eventTime);
+                changed = true;
+            }
+
+            if (!changed) {
+                return;
+            }
+
+            mDirty |= DIRTY_USER_ACTIVITY;
+            updatePowerStateLocked();
+        }
     }
 
     private void userActivityInternal(int displayId, long eventTime,

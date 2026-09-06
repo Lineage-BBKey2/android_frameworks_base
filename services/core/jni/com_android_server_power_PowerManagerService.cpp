@@ -61,6 +61,7 @@ namespace android {
 
 static struct {
     jmethodID userActivityFromNative;
+    jmethodID touchpadActivityFromNative;
 } gPowerManagerServiceClassInfo;
 
 // ----------------------------------------------------------------------------
@@ -68,6 +69,7 @@ static struct {
 static jobject gPowerManagerServiceObj;
 static power::PowerHalController gPowerHalController;
 static nsecs_t gLastEventTime[USER_ACTIVITY_EVENT_LAST + 1];
+static nsecs_t gLastTouchpadActivityTime = LLONG_MIN;
 
 // Throttling interval for user activity calls.
 static const nsecs_t MIN_TIME_BETWEEN_USERACTIVITIES = 100 * 1000000L; // 100ms
@@ -134,6 +136,31 @@ void android_server_PowerManagerService_userActivity(nsecs_t eventTime, int32_t 
                             flags);
         checkAndClearExceptionFromCallback(env, "userActivityFromNative");
     }
+}
+
+void android_server_PowerManagerService_touchpadActivity(nsecs_t eventTime) {
+    if (!gPowerManagerServiceObj) {
+        return;
+    }
+
+    nsecs_t now = systemTime(SYSTEM_TIME_MONOTONIC);
+    if (eventTime > now) {
+        eventTime = now;
+    }
+
+    // Touchpad MOVE events can arrive rapidly. Match the existing user-activity
+    // throttling interval instead of entering PowerManagerService for every frame.
+    if (gLastTouchpadActivityTime + MIN_TIME_BETWEEN_USERACTIVITIES
+            > eventTime) {
+        return;
+    }
+    gLastTouchpadActivityTime = eventTime;
+
+    JNIEnv* env = AndroidRuntime::getJNIEnv();
+    env->CallVoidMethod(gPowerManagerServiceObj,
+            gPowerManagerServiceClassInfo.touchpadActivityFromNative,
+            nanoseconds_to_milliseconds(eventTime));
+    checkAndClearExceptionFromCallback(env, "touchpadActivityFromNative");
 }
 
 static std::shared_ptr<ISystemSuspend> gSuspendHal = nullptr;
@@ -293,6 +320,9 @@ int register_android_server_PowerManagerService(JNIEnv* env) {
 
     GET_METHOD_ID(gPowerManagerServiceClassInfo.userActivityFromNative, clazz,
             "userActivityFromNative", "(JIII)V");
+
+    GET_METHOD_ID(gPowerManagerServiceClassInfo.touchpadActivityFromNative,
+            clazz, "touchpadActivityFromNative", "(J)V");
 
     if (!com::android::input::flags::rate_limit_user_activity_poke_in_dispatcher()) {
         // Initialize

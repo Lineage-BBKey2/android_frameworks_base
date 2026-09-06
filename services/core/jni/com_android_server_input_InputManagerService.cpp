@@ -379,6 +379,7 @@ public:
                                      int32_t deviceId) override;
     void notifyTouchpadGestureInfo(enum GestureType type, int32_t deviceId) override;
     void notifyTouchpadThreeFingerTap() override;
+    void notifyTouchpadActivity(nsecs_t eventTime) override;
     std::shared_ptr<KeyCharacterMap> getKeyboardLayoutOverlay(
             const InputDeviceIdentifier& identifier,
             const std::optional<KeyboardLayoutInfo> keyboardLayoutInfo) override;
@@ -1915,6 +1916,11 @@ void NativeInputManager::pokeUserActivity(nsecs_t eventTime, int32_t eventType,
                                           ui::LogicalDisplayId displayId, int32_t keyCode) {
     ATRACE_CALL();
     android_server_PowerManagerService_userActivity(eventTime, eventType, displayId, keyCode);
+}
+
+void NativeInputManager::notifyTouchpadActivity(nsecs_t eventTime) {
+    ATRACE_CALL();
+    android_server_PowerManagerService_touchpadActivity(eventTime);
 }
 
 void NativeInputManager::onPointerDownOutsideFocus(const sp<IBinder>& touchedToken) {

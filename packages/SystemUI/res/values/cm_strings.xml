@@ -83,7 +83,8 @@
     <string name="quick_settings_powershare_enabled_label">Wireless PowerShare is enabled</string>
 
     <!-- TouchKeypad QS tile -->
-    <string name="quick_settings_touchkeypad_label">Keyboard touchpad</string>
+    <string name="quick_settings_touchkeypad_label">Keyboard scrolling</string>
+    <string name="quick_settings_touchkeypad_unavailable">Touchpad disabled</string>
 
     <!-- Reader mode QS tile -->
     <string name="quick_settings_reading_mode">Reading mode</string>
