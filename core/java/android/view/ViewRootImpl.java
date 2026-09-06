@@ -7773,10 +7773,18 @@ public final class ViewRootImpl implements ViewParent,
                 return processPointerEvent(q);
             }
 
+            final boolean isTouchKeypad =
+                    event.isFromSource(InputDevice.SOURCE_TOUCHPAD)
+                            && event.getDeviceId() == View.getTouchKeypadDeviceId();
+
             // If the motion event is from an absolute position device, exit touch mode
             final int action = event.getActionMasked();
             if (action == MotionEvent.ACTION_DOWN || action == MotionEvent.ACTION_SCROLL) {
-                if (event.isFromSource(InputDevice.SOURCE_CLASS_POSITION)) {
+                // Touching Athena's capacitive keyboard must not move application
+                // focus to the first focusable view. Its motion is handled later by
+                // SyntheticTouchKeypadHandler or by an interested application/IME.
+                if (event.isFromSource(InputDevice.SOURCE_CLASS_POSITION)
+                        && !isTouchKeypad) {
                     ensureTouchMode(false);
                 }
             }
