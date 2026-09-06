@@ -30,6 +30,9 @@ extern void android_server_PowerManagerService_userActivity(nsecs_t eventTime, i
                                                             ui::LogicalDisplayId displayId,
                                                             int32_t keyCode);
 
+extern void android_server_PowerManagerService_touchpadActivity(
+        nsecs_t eventTime);
+
 } // namespace android
 
 #endif // _ANDROID_SERVER_POWER_MANAGER_SERVICE_H

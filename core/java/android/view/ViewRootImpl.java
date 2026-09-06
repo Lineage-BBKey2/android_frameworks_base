@@ -8309,6 +8309,14 @@ public final class ViewRootImpl implements ViewParent,
         return mView != null ? mView.findFocus() : null;
     }
 
+    private static final String TOUCH_KEYPAD_SCROLLING_DISABLED_PROPERTY =
+            "persist.vendor.touchkeypad.scrolling_disabled";
+
+    private static boolean isTouchKeypadScrollingEnabled() {
+        return !SystemProperties.getBoolean(
+                TOUCH_KEYPAD_SCROLLING_DISABLED_PROPERTY, false);
+    }
+
     /**
      * Performs synthesis of new input events from unhandled input events.
      */
@@ -8344,7 +8352,14 @@ public final class ViewRootImpl implements ViewParent,
                 } else if ((source & InputDevice.SOURCE_TOUCHPAD)
                         == InputDevice.SOURCE_TOUCHPAD
                         && event.getDeviceId() == View.getTouchKeypadDeviceId()) {
-                    mTouchKeypad.process(event);
+                    if (isTouchKeypadScrollingEnabled()) {
+                        mTouchKeypad.process(event);
+                    } else {
+                        // Consume the built-in keyboard touchpad event without generating
+                        // scrolling. InputDispatcher has already reported the touch to
+                        // PowerManagerService for keyboard/button backlight handling.
+                        mTouchKeypad.cancel(event);
+                    }
                     return FINISH_HANDLED;
                 } else if ((source & InputDevice.SOURCE_TOUCH_NAVIGATION)
                         == InputDevice.SOURCE_TOUCH_NAVIGATION) {
@@ -9196,7 +9211,15 @@ public final class ViewRootImpl implements ViewParent,
                 new Choreographer.FrameCallback() {
             @Override
             public void doFrame(long frameTimeNanos) {
-                if (!mFlinging) return;
+                if (!mFlinging) {
+                    return;
+                }
+
+                if (!isTouchKeypadScrollingEnabled()) {
+                    cancelFling();
+                    return;
+                }
+
                 if (!mScroller.computeScrollOffset()) {
                     mFlinging = false;
                     return;
