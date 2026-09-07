@@ -6724,4 +6724,8 @@ ul.</string>
 
     <!-- Fingerprint loe notification string -->
     <string name="fingerprint_loe_notification_msg">Your fingerprints can no longer be recognized. Set up Fingerprint Unlock again.</string>
+
+    <!-- BlackBerry PIM compatibility permission. -->
+    <string name="permlab_readBlackBerryMessages">read BlackBerry Hub messages</string>
+    <string name="permdesc_readBlackBerryMessages">read BlackBerry Hub messages if available</string>
 </resources>
