@@ -880,6 +880,12 @@
     <!-- ====================================================================== -->
     <eat-comment />
 
+    <!-- @hide Compatibility permission for legacy BlackBerry Keyboard personalization. -->
+    <permission android:name="com.blackberry.pim.permission.READ_MESSAGES"
+        android:label="@string/permlab_readBlackBerryMessages"
+        android:description="@string/permdesc_readBlackBerryMessages"
+        android:protectionLevel="dangerous" />
+
     <!-- Used for runtime permissions related to contacts and profiles on this
         device. -->
     <permission-group android:name="android.permission-group.CONTACTS"

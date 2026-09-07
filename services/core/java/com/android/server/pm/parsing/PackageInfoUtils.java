@@ -98,6 +98,21 @@ import java.util.Set;
 public class PackageInfoUtils {
     private static final String TAG = ParsingUtils.TAG;
 
+    private static final String BLACKBERRY_INFRASTRUCTURE_PACKAGE =
+            "com.blackberry.infrastructure";
+    private static final String BLACKBERRY_MESSAGE_PROVIDER =
+            "com.blackberry.message.provider.MessageProvider";
+    private static final String BLACKBERRY_MESSAGE_AUTHORITY =
+            "com.blackberry.message.provider";
+    private static final String BLACKBERRY_INTERNAL_PERMISSION =
+            "com.blackberry.pim.permission.INTERNAL";
+    private static final String BLACKBERRY_READ_MESSAGES_PERMISSION =
+            "com.blackberry.pim.permission.READ_MESSAGES";
+    private static final String BLACKBERRY_MESSAGE_PATH = 
+            "/message";
+    private static final String BLACKBERRY_MESSAGE_BODY_PATH = 
+            "/messagebody";
+
     private static final String SYSTEM_DATA_PATH =
             Environment.getDataDirectoryPath() + File.separator + "system";
 
@@ -702,7 +717,23 @@ public class PackageInfoUtils {
         pi.multiprocess = p.isMultiProcess();
         pi.initOrder = p.getInitOrder();
         pi.uriPermissionPatterns = p.getUriPermissionPatterns().toArray(new PatternMatcher[0]);
-        pi.pathPermissions = p.getPathPermissions().toArray(new PathPermission[0]);
+        final List<PathPermission> pathPermissions =
+                new ArrayList<>(p.getPathPermissions());
+        if (isBlackBerryMessageProvider(pkg, p)) {
+            // Preserve Hub+ Services' INTERNAL provider permission while restoring
+            // legacy read-only access for the paths used by BlackBerry Keyboard.
+            pathPermissions.add(new PathPermission(
+                    BLACKBERRY_MESSAGE_PATH,
+                    PatternMatcher.PATTERN_LITERAL,
+                    BLACKBERRY_READ_MESSAGES_PERMISSION,
+                    null));
+            pathPermissions.add(new PathPermission(
+                    BLACKBERRY_MESSAGE_BODY_PATH,
+                    PatternMatcher.PATTERN_LITERAL,
+                    BLACKBERRY_READ_MESSAGES_PERMISSION,
+                    null));
+        }
+        pi.pathPermissions = pathPermissions.toArray(new PathPermission[0]);
         if ((flags & PackageManager.GET_URI_PERMISSION_PATTERNS) == 0) {
             pi.uriPermissionPatterns = null;
         }
@@ -714,6 +745,18 @@ public class PackageInfoUtils {
         pi.applicationInfo = applicationInfo;
         assignFieldsComponentInfoParsedMainComponent(pi, p, pkgSetting, userId);
         return pi;
+    }
+
+    private static boolean isBlackBerryMessageProvider(
+            AndroidPackage pkg, ParsedProvider p) {
+        final String authorities = p.getAuthority();
+        return BLACKBERRY_INFRASTRUCTURE_PACKAGE.equals(pkg.getPackageName())
+                && BLACKBERRY_MESSAGE_PROVIDER.equals(p.getName())
+                && BLACKBERRY_INTERNAL_PERMISSION.equals(p.getReadPermission())
+                && BLACKBERRY_INTERNAL_PERMISSION.equals(p.getWritePermission())
+                && authorities != null
+                && (";" + authorities + ";").contains(
+                        ";" + BLACKBERRY_MESSAGE_AUTHORITY + ";");
     }
 
     /**
