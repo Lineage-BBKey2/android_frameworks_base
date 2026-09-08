@@ -35,10 +35,12 @@ import static android.app.ActivityManager.printCapabilitiesSummary;
 import static android.app.ActivityManager.procStateToString;
 import static android.app.PendingIntent.FLAG_IMMUTABLE;
 import static android.app.PendingIntent.FLAG_UPDATE_CURRENT;
+import static android.content.Intent.ACTION_EXTERNAL_APPLICATIONS_AVAILABLE;
 import static android.content.Intent.ACTION_PACKAGE_ADDED;
 import static android.content.Intent.ACTION_UID_REMOVED;
 import static android.content.Intent.ACTION_USER_ADDED;
 import static android.content.Intent.ACTION_USER_REMOVED;
+import static android.content.Intent.EXTRA_CHANGED_UID_LIST;
 import static android.content.Intent.EXTRA_UID;
 import static android.content.pm.ApplicationInfo.FLAG_INSTALLED;
 import static android.content.pm.ApplicationInfo.PRIVATE_FLAG_HIDDEN;
@@ -1189,6 +1191,14 @@ public class NetworkPolicyManagerService extends INetworkPolicyManager.Stub {
             packageFilter.addDataScheme("package");
             mContext.registerReceiverForAllUsers(mPackageReceiver, packageFilter, null, mHandler);
 
+            // Apps on adopted/private storage become available after the volume is mounted,
+            // without receiving PACKAGE_ADDED again. Refresh their UID network rules once
+            // PackageManager has loaded them.
+            final IntentFilter externalApplicationsFilter =
+                    new IntentFilter(ACTION_EXTERNAL_APPLICATIONS_AVAILABLE);
+            mContext.registerReceiverForAllUsers(
+                    mPackageReceiver, externalApplicationsFilter, null, mHandler);
+
             // listen for UID changes to update policy
             mContext.registerReceiverForAllUsers(
                     mUidRemovedReceiver, new IntentFilter(ACTION_UID_REMOVED), null, mHandler);
@@ -1476,13 +1486,14 @@ public class NetworkPolicyManagerService extends INetworkPolicyManager.Stub {
     final private BroadcastReceiver mPackageReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
-            // on background handler thread, and PACKAGE_ADDED is protected
+            // on background handler thread; package lifecycle broadcasts handled here are protected
 
             final String action = intent.getAction();
-            final int uid = intent.getIntExtra(EXTRA_UID, -1);
-            if (uid == -1) return;
 
             if (ACTION_PACKAGE_ADDED.equals(action)) {
+                final int uid = intent.getIntExtra(EXTRA_UID, -1);
+                if (uid == -1) return;
+
                 // update rules for UID, since it might be subject to
                 // global background data policy
                 // Clear the cache for the app
@@ -1493,6 +1504,30 @@ public class NetworkPolicyManagerService extends INetworkPolicyManager.Stub {
                         addUidPolicy(uid, POLICY_REJECT_ALL);
                     }
                     updateRestrictionRulesForUidUL(uid);
+                }
+            } else if (ACTION_EXTERNAL_APPLICATIONS_AVAILABLE.equals(action)) {
+                final int[] changedUids = intent.getIntArrayExtra(EXTRA_CHANGED_UID_LIST);
+                if (changedUids == null) return;
+
+                final int userId = intent.getIntExtra(
+                        Intent.EXTRA_USER_HANDLE, UserHandle.USER_NULL);
+                if (userId == UserHandle.USER_NULL) return;
+
+                synchronized (mUidRulesFirstLock) {
+                    for (final int changedUid : changedUids) {
+                        if (changedUid < 0) continue;
+
+                        // EXTRA_CHANGED_UID_LIST contains package app IDs. Reconstruct
+                        // the UID for the user receiving this availability broadcast.
+                        final int uid = UserHandle.getUid(
+                                userId, UserHandle.getAppId(changedUid));
+
+                        // PackageManager may have been queried while the adopted
+                        // volume was unavailable, so discard any cached result before
+                        // recalculating the complete set of UID network rules.
+                        mInternetPermissionMap.delete(uid);
+                        updateRestrictionRulesForUidUL(uid);
+                    }
                 }
             }
         }
