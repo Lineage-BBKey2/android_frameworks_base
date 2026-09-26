@@ -34,7 +34,6 @@ import androidx.core.view.ViewKt;
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.keyguard.AuthKeyguardMessageArea;
 import com.android.keyguard.KeyguardUnfoldTransition;
-import com.android.keyguard.KeyguardPinViewController;
 import com.android.systemui.Dumpable;
 import com.android.systemui.animation.ActivityTransitionAnimator;
 import com.android.systemui.bouncer.domain.interactor.AlternateBouncerInteractor;
@@ -634,16 +633,6 @@ public class NotificationShadeWindowViewController implements Dumpable {
 
             @Override
             public boolean dispatchKeyEvent(KeyEvent event) {
-                // --- Key2 Keyboard PIN Tweak ---
-                if (event.getAction() == KeyEvent.ACTION_DOWN && event.getRepeatCount() == 0) {
-                    KeyguardPinViewController activePin = KeyguardPinViewController.getActiveInstance();
-                    if (activePin != null) {
-                        if (activePin.handleHardwareKeyCode(event.getKeyCode())) {
-                            return true; // consumed here
-                        }
-                    }
-                }
-                // --- End Key2 Keyboard PIN Tweak ---
                 return mSysUIKeyEventHandler.dispatchKeyEvent(event);
             }
 

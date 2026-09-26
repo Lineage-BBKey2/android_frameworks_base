@@ -36,35 +36,71 @@ import com.android.systemui.user.domain.interactor.SelectedUserInteractor;
 
 import lineageos.providers.LineageSettings;
 
+import android.os.SystemProperties;
 import android.provider.Settings;
 import android.view.KeyEvent;
+
+import java.util.ArrayList;
 
 public class KeyguardPinViewController
         extends KeyguardPinBasedInputViewController<KeyguardPINView> {
     // --- Key2 Keyboard PIN Tweak ---
-    private static volatile KeyguardPinViewController sActiveInstance;
+    private static final ArrayList<KeyguardPinViewController> sAttachedInstances =
+            new ArrayList<>();
 
-    public static KeyguardPinViewController getActiveInstance() {
-        return sActiveInstance;
+    public static KeyguardPinViewController getActiveInstance(View shadeWindow) {
+        View root = shadeWindow.getRootView();
+
+        // Once the PIN screen is displayed, send keys to its controller.
+        for (int i = sAttachedInstances.size() - 1; i >= 0; i--) {
+            KeyguardPinViewController controller = sAttachedInstances.get(i);
+            if (controller.mView.isAttachedToWindow()
+                    && controller.mView.getRootView() == root
+                    && controller.mView.isShown()) {
+                return controller;
+            }
+        }
+
+        // Before swipe-up, continue using an attached hidden PIN view.
+        for (int i = sAttachedInstances.size() - 1; i >= 0; i--) {
+            KeyguardPinViewController controller = sAttachedInstances.get(i);
+            if (controller.mView.isAttachedToWindow()
+                    && controller.mView.getRootView() == root) {
+                return controller;
+            }
+        }
+
+        return null;
     }
 
-    /** Called directly from the window-level dispatchKeyEvent. */
-    public boolean handleHardwareKeyCode(int keyCode) {
-        boolean pinInputEnabled = Settings.Secure.getInt(
-                getContext().getContentResolver(), "keyboard_pin_input", 1) == 1;
-        if (!pinInputEnabled) {
+    /** Handles mapped physical keyboard keys while the PIN lockscreen is visible. */
+    public boolean handleHardwareKeyEvent(KeyEvent event) {
+        if (!mKeyguardUpdateMonitor.isKeyguardVisible()
+                || Settings.Secure.getInt(
+                        getContext().getContentResolver(), "keyboard_pin_input", 1) != 1) {
             return false;
         }
-        int viewId = mapKey2Pin(keyCode);
+
+        int viewId = mapKey2Pin(event.getKeyCode());
         if (viewId == -1) {
             return false;
         }
+
         View keyView = mView.findViewById(viewId);
         if (keyView == null) {
             return false;
         }
-        onUserInput();
-        keyView.performClick();
+
+        // Consume both halves of a mapped key press, but click only once.
+        if (event.getAction() == KeyEvent.ACTION_UP) {
+            return true;
+        }
+        if (event.getAction() != KeyEvent.ACTION_DOWN) {
+            return false;
+        }
+        if (event.getRepeatCount() == 0) {
+            keyView.performClick();
+        }
         return true;
     }
 
@@ -78,8 +114,8 @@ public class KeyguardPinViewController
             if (showing) {
                 KeyguardPinViewController.this.reset();
             }
-    }
-};
+        }
+    };
     // --- End Key2 Keyboard PIN Tweak ---
 
     private final KeyguardUpdateMonitor mKeyguardUpdateMonitor;
@@ -128,8 +164,11 @@ public class KeyguardPinViewController
     @Override
     protected void onViewAttached() {
         super.onViewAttached();
-        sActiveInstance = this; // --- Key2 Keyboard PIN Tweak ---
-        mKeyguardUpdateMonitor.registerCallback(mUpdateMonitorCallback); // --- Key2 Keyboard PIN Tweak ---
+        // --- Key2 Keyboard PIN Tweak ---
+        sAttachedInstances.remove(this);
+        sAttachedInstances.add(this);
+        mKeyguardUpdateMonitor.registerCallback(mUpdateMonitorCallback);
+        // --- End Key2 Keyboard PIN Tweak ---
         View cancelBtn = mView.findViewById(R.id.cancel_button);
         if (cancelBtn != null) {
             cancelBtn.setOnClickListener(view -> {
@@ -166,8 +205,10 @@ public class KeyguardPinViewController
     protected void onViewDetached() {
         super.onViewDetached();
         mPostureController.removeCallback(mPostureCallback);
-        if (sActiveInstance == this) sActiveInstance = null; // --- Key2 Keyboard PIN Tweak ---
-        mKeyguardUpdateMonitor.removeCallback(mUpdateMonitorCallback); // --- Key2 Keyboard PIN Tweak ---
+        // --- Key2 Keyboard PIN Tweak ---
+        sAttachedInstances.remove(this);
+        mKeyguardUpdateMonitor.removeCallback(mUpdateMonitorCallback);
+        // --- End Key2 Keyboard PIN Tweak ---
     }
 
     @Override
@@ -270,24 +311,53 @@ public class KeyguardPinViewController
         }
     }
 
+    /** Key2 Keyboard PIN Tweak - keyboard-layout-aware digit mapping */
+    private static final int LAYOUT_QWERTY = 0;
+    private static final int LAYOUT_QWERTZ = 1;
+    private static final int LAYOUT_AZERTY = 2;
+
+    private final int mKeyboardLayout = detectKeyboardLayout();
+
+    private static int detectKeyboardLayout() {
+        String kl = SystemProperties.get("ro.hwf.keypadlanguage", "qwerty").toLowerCase();
+        if (kl.contains("qwertz")) return LAYOUT_QWERTZ;
+        if (kl.contains("azerty")) return LAYOUT_AZERTY;
+        return LAYOUT_QWERTY; // safe default for qwerty and any unrecognized value
+    }
+
     /** Key2 Keyboard PIN Tweak - Map physical keyboard keycodes to numbers */
     private int mapKey2Pin(int keyCode) {
         switch (keyCode) {
-            case KeyEvent.KEYCODE_W: return R.id.key1;
             case KeyEvent.KEYCODE_E: return R.id.key2;
             case KeyEvent.KEYCODE_R: return R.id.key3;
             case KeyEvent.KEYCODE_S: return R.id.key4;
             case KeyEvent.KEYCODE_D: return R.id.key5;
             case KeyEvent.KEYCODE_F: return R.id.key6;
-            case KeyEvent.KEYCODE_Z: return R.id.key7;
             case KeyEvent.KEYCODE_X: return R.id.key8;
             case KeyEvent.KEYCODE_C: return R.id.key9;
             case KeyEvent.KEYCODE_0: return R.id.key0;
-            case KeyEvent.KEYCODE_Q: return R.id.key0;
             case KeyEvent.KEYCODE_DEL: return R.id.delete_button;
             case KeyEvent.KEYCODE_ENTER: return R.id.key_enter;
-            default: return -1;
         }
+        // W/Y/Z positions vary by keyboard layout — everything else above is constant
+        switch (mKeyboardLayout) {
+            case LAYOUT_QWERTZ:
+                if (keyCode == KeyEvent.KEYCODE_Q) return R.id.key0;
+                if (keyCode == KeyEvent.KEYCODE_W) return R.id.key1;
+                if (keyCode == KeyEvent.KEYCODE_Y) return R.id.key7;
+                break;
+            case LAYOUT_AZERTY:
+                if (keyCode == KeyEvent.KEYCODE_A) return R.id.key0;
+                if (keyCode == KeyEvent.KEYCODE_W) return R.id.key7;
+                if (keyCode == KeyEvent.KEYCODE_Z) return R.id.key1;
+                break;
+            default: // LAYOUT_QWERTY
+                if (keyCode == KeyEvent.KEYCODE_Q) return R.id.key0;
+                if (keyCode == KeyEvent.KEYCODE_W) return R.id.key1;
+                if (keyCode == KeyEvent.KEYCODE_Z) return R.id.key7;
+            break;
+        }
+        return -1;
     }
 
 
