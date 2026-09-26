@@ -53,6 +53,7 @@ import android.view.WindowInsetsController;
 import com.android.app.viewcapture.ViewCaptureFactory;
 import com.android.internal.view.FloatingActionMode;
 import com.android.internal.widget.floatingtoolbar.FloatingToolbar;
+import com.android.keyguard.KeyguardPinViewController;
 import com.android.systemui.scene.ui.view.WindowRootView;
 import com.android.systemui.shade.shared.flag.ShadeWindowGoesAround;
 import com.android.systemui.statusbar.phone.ConfigurationForwarder;
@@ -107,6 +108,13 @@ public class NotificationShadeWindowView extends WindowRootView {
         if (mInteractionEventHandler.interceptMediaKey(event)) {
             return true;
         }
+
+        // --- Key2 Keyboard PIN Tweak ---
+        KeyguardPinViewController activePin = KeyguardPinViewController.getActiveInstance(this);
+        if (activePin != null && activePin.handleHardwareKeyEvent(event)) {
+            return true;
+        }
+        // --- End Key2 Keyboard PIN Tweak ---
 
         if (super.dispatchKeyEvent(event)) {
             return true;
