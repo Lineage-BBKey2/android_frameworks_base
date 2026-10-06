@@ -336,6 +336,15 @@
         -1 means system internal default value is used. -->
     <integer name="def_battery_charging_state_enforce_level">-1</integer>
 
+    <!-- Optional device display density used for initial setup and reset.
+         Zero uses the physical default. -->
+    <integer name="def_display_density_forced">0</integer>
+
+    <!-- Optional forced-display-density migration. Both arrays must have
+         the same number of elements. -->
+    <integer-array name="config_display_density_migration_from" />
+    <integer-array name="config_display_density_migration_to" />
+
     <!-- Value to use as default scale for fonts -->
     <item name="def_device_font_scale" format="float" type="dimen">1.0</item>
 

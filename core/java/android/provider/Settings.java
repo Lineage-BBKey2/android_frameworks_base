@@ -9455,6 +9455,15 @@ public final class Settings {
         public static final String DISPLAY_DENSITY_FORCED = "display_density_forced";
 
         /**
+         * Default display density for the specific device, in DPI.
+         *
+         * @hide
+         */
+        @Readable
+        public static final String DEFAULT_DEVICE_DISPLAY_DENSITY =
+                "device_display_density";
+
+        /**
          * Setting to always use the default text-to-speech settings regardless
          * of the application settings.
          * 1 = override application settings,

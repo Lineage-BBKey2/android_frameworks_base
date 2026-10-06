@@ -3998,7 +3998,7 @@ public class SettingsProvider extends ContentProvider {
         }
 
         private final class UpgradeController {
-            private static final int SETTINGS_VERSION = 226;
+            private static final int SETTINGS_VERSION = 227;
 
             private final int mUserId;
 
@@ -6169,6 +6169,9 @@ public class SettingsProvider extends ContentProvider {
                 //              R.dimen.def_device_font_scale configuration property.
                 if (currentVersion == 224) {
                     handleDefaultFontScale(getSystemSettingsLocked(userId));
+                    handleDefaultDisplayDensity(
+                            getSecureSettingsLocked(userId),
+                            /* initializeCurrentDensity= */ true);
                     currentVersion = 225;
                 }
 
@@ -6192,6 +6195,17 @@ public class SettingsProvider extends ContentProvider {
                         }
                     }
                     currentVersion = 226;
+                }
+
+                // Version 226: Refresh the device defaults used by the display-size
+                // and font-size reset action, and migrate obsolete generated densities.
+                if (currentVersion == 226) {
+                    handleDefaultFontScale(getSystemSettingsLocked(userId));
+                    handleDefaultDisplayDensity(
+                            getSecureSettingsLocked(userId),
+                            /* initializeCurrentDensity= */ false);
+                    migrateDisplayDensity(getSecureSettingsLocked(userId));
+                    currentVersion = 227;
                 }
 
                 // vXXX: Add new settings above this point.
@@ -6234,6 +6248,82 @@ public class SettingsProvider extends ContentProvider {
                             /* tag= */ null,
                             /* makeDefault= */ false,
                             SettingsState.SYSTEM_PACKAGE_NAME);
+                }
+            }
+
+            @SuppressWarnings("GuardedBy")
+            @GuardedBy("mLock")
+            private void handleDefaultDisplayDensity(
+                    @NonNull SettingsState secureSettings,
+                    boolean initializeCurrentDensity) {
+                final int defaultDisplayDensity = getContext().getResources()
+                        .getInteger(R.integer.def_display_density_forced);
+                if (defaultDisplayDensity <= 0) {
+                    return;
+                }
+
+                // Persist the device default for Settings' Reset settings action.
+                secureSettings.insertSettingLocked(
+                        Settings.Secure.DEFAULT_DEVICE_DISPLAY_DENSITY,
+                        String.valueOf(defaultDisplayDensity),
+                        /* tag= */ null,
+                        /* makeDefault= */ false,
+                        SettingsState.SYSTEM_PACKAGE_NAME);
+
+                if (!initializeCurrentDensity) {
+                    return;
+                }
+
+                final Setting existingDisplayDensity = secureSettings.getSettingLocked(
+                        Settings.Secure.DISPLAY_DENSITY_FORCED);
+                if (existingDisplayDensity == null || existingDisplayDensity.isNull()) {
+                    secureSettings.insertSettingLocked(
+                            Settings.Secure.DISPLAY_DENSITY_FORCED,
+                            String.valueOf(defaultDisplayDensity),
+                            /* tag= */ null,
+                            /* makeDefault= */ false,
+                            SettingsState.SYSTEM_PACKAGE_NAME);
+                }
+            }
+
+            @SuppressWarnings("GuardedBy")
+            @GuardedBy("mLock")
+            private void migrateDisplayDensity(@NonNull SettingsState secureSettings) {
+                final int[] oldDensities = getContext().getResources()
+                        .getIntArray(R.array.config_display_density_migration_from);
+                final int[] newDensities = getContext().getResources()
+                        .getIntArray(R.array.config_display_density_migration_to);
+
+                if (oldDensities.length != newDensities.length) {
+                    Slog.w(LOG_TAG, "Display density migration arrays have different lengths");
+                    return;
+                }
+
+                final Setting densitySetting = secureSettings.getSettingLocked(
+                        Settings.Secure.DISPLAY_DENSITY_FORCED);
+                if (densitySetting == null || densitySetting.isNull()) {
+                    return;
+                }
+
+                final int currentDensity;
+                try {
+                    currentDensity = Integer.parseInt(densitySetting.getValue());
+                } catch (NumberFormatException e) {
+                    Slog.w(LOG_TAG, "Invalid forced display density: "
+                            + densitySetting.getValue());
+                    return;
+                }
+
+                for (int i = 0; i < oldDensities.length; i++) {
+                    if (currentDensity == oldDensities[i]) {
+                        secureSettings.insertSettingLocked(
+                                Settings.Secure.DISPLAY_DENSITY_FORCED,
+                                String.valueOf(newDensities[i]),
+                                /* tag= */ null,
+                                /* makeDefault= */ false,
+                                SettingsState.SYSTEM_PACKAGE_NAME);
+                        return;
+                    }
                 }
             }
 
