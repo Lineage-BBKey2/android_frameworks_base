@@ -323,7 +323,9 @@ public final class PowerManagerService extends SystemService
     private static final IntArray DEFAULT_DISPLAY_GROUP_IDS =
             IntArray.wrap(new int[]{Display.DEFAULT_DISPLAY_GROUP});
 
-    private static final int DEFAULT_BUTTON_ON_DURATION = 5 * 1000;
+    private static final int DEFAULT_BUTTON_ON_DURATION = 10 * 1000;
+    private static final int DEFAULT_KEYBOARD_ON_DURATION = 10 * 1000;
+
 
     private final Context mContext;
     private final ServiceThread mHandlerThread;
@@ -1792,7 +1794,8 @@ public final class PowerManagerService extends SystemService
                 "button_backlight_on_keyboard_touch", 0,
                 UserHandle.USER_CURRENT) == 1;
         mKeyboardTimeout = Settings.Secure.getIntForUser(resolver,
-                "keyboard_backlight_timeout", 0, UserHandle.USER_CURRENT);
+                "keyboard_backlight_timeout", DEFAULT_KEYBOARD_ON_DURATION,
+                UserHandle.USER_CURRENT);
         int kbdPressedOverride = Settings.Secure.getIntForUser(resolver,
                 "keyboard_backlight_only_when_pressed", -1, UserHandle.USER_CURRENT);
         if (kbdPressedOverride >= 0) mKeyboardLightOnKeypressOnly = kbdPressedOverride == 1;
