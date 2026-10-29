@@ -60,6 +60,7 @@ import com.android.systemui.statusbar.connectivity.WifiIndicators;
 import com.android.systemui.statusbar.phone.SystemUIDialog;
 import com.android.systemui.statusbar.pipeline.shared.data.model.DefaultConnectionModel;
 import com.android.systemui.statusbar.pipeline.shared.data.repository.ConnectivityRepository;
+import com.android.systemui.statusbar.pipeline.wifi.data.repository.WifiRepository;
 import com.android.systemui.statusbar.policy.CastController;
 import com.android.systemui.statusbar.policy.CastDevice;
 import com.android.systemui.statusbar.policy.HotspotController;
@@ -90,6 +91,7 @@ public class CastTile extends QSTileImpl<BooleanState> {
     private final TileJavaAdapter mJavaAdapter;
     private final FeatureFlags mFeatureFlags;
     private boolean mCastTransportAllowed;
+    private boolean mWifiEnabled;
     private boolean mHotspotEnabled;
 
     @Inject
@@ -109,6 +111,7 @@ public class CastTile extends QSTileImpl<BooleanState> {
             HotspotController hotspotController,
             DialogTransitionAnimator dialogTransitionAnimator,
             ConnectivityRepository connectivityRepository,
+            WifiRepository wifiRepository,
             TileJavaAdapter javaAdapter,
             FeatureFlags featureFlags
     ) {
@@ -130,6 +133,8 @@ public class CastTile extends QSTileImpl<BooleanState> {
                     connectivityRepository.getDefaultConnections(),
                     mNetworkModelConsumer
             );
+            // Miracast uses Wi-Fi Direct and does not require a router connection.
+            mJavaAdapter.bind(this, wifiRepository.isWifiEnabled(), this::setWifiEnabled);
         }
         hotspotController.observe(this, mHotspotCallback);
     }
@@ -320,7 +325,14 @@ public class CastTile extends QSTileImpl<BooleanState> {
     }
 
     private boolean canCastToNetwork() {
-        return mCastTransportAllowed || mHotspotEnabled;
+        return mWifiEnabled || mCastTransportAllowed || mHotspotEnabled;
+    }
+
+    private void setWifiEnabled(boolean enabled) {
+        if (enabled != mWifiEnabled) {
+            mWifiEnabled = enabled;
+            refreshState();
+        }
     }
 
     private void setCastTransportAllowed(boolean enabled) {

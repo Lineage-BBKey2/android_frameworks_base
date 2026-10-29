@@ -55,6 +55,7 @@ import com.android.systemui.statusbar.connectivity.NetworkController;
 import com.android.systemui.statusbar.connectivity.SignalCallback;
 import com.android.systemui.statusbar.connectivity.WifiIndicators;
 import com.android.systemui.statusbar.pipeline.shared.data.repository.FakeConnectivityRepository;
+import com.android.systemui.statusbar.pipeline.wifi.data.repository.FakeWifiRepository;
 import com.android.systemui.statusbar.policy.CastController;
 import com.android.systemui.statusbar.policy.CastDevice;
 import com.android.systemui.statusbar.policy.HotspotController;
@@ -104,6 +105,7 @@ public class CastTileTest extends SysuiTestCase {
     private QsEventLogger mUiEventLogger;
 
     private final TileJavaAdapter mJavaAdapter = new TileJavaAdapter();
+    private final FakeWifiRepository mWifiRepository = new FakeWifiRepository();
     private final FakeConnectivityRepository mConnectivityRepository =
             new FakeConnectivityRepository();
     private final FakeFeatureFlags mFeatureFlags = new FakeFeatureFlags();
@@ -534,6 +536,7 @@ public class CastTileTest extends SysuiTestCase {
                 mHotspotController,
                 mDialogTransitionAnimator,
                 mConnectivityRepository,
+                mWifiRepository,
                 mJavaAdapter,
                 mFeatureFlags
         );
@@ -577,6 +580,7 @@ public class CastTileTest extends SysuiTestCase {
                 mHotspotController,
                 mDialogTransitionAnimator,
                 mConnectivityRepository,
+                mWifiRepository,
                 mJavaAdapter,
                 mFeatureFlags
         );
