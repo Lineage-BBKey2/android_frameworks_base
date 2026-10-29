@@ -377,6 +377,8 @@ public final class PowerManagerService extends SystemService
     private boolean mKeyboardLightOnKeypressOnly;
     private boolean mKeyboardLightOnTouch;
     private boolean mButtonLightOnKeyboardTouch;
+    private boolean mKeyboardAdaptiveBrightness;
+    private boolean mKeyboardBacklightHighBrightnessOff;
 
     // Lazy-loaded hardware identifier for device-specific adaptive backlight scaling
     private Boolean mIsLuna = null;
@@ -1629,6 +1631,12 @@ public final class PowerManagerService extends SystemService
         resolver.registerContentObserver(Settings.Secure.getUriFor(
                 "keyboard_backlight_on_touch"),
                 false, mSettingsObserver, UserHandle.USER_ALL);
+        resolver.registerContentObserver(Settings.Secure.getUriFor(
+                "keyboard_adaptive_brightness"),
+                false, mSettingsObserver, UserHandle.USER_ALL);
+        resolver.registerContentObserver(Settings.Secure.getUriFor(
+                "keyboard_backlight_high_brightness_off"),
+                false, mSettingsObserver, UserHandle.USER_ALL);
         resolver.registerContentObserver(LineageSettings.System.getUriFor(
                 LineageSettings.System.FORCE_SHOW_NAVBAR),
                 false, mSettingsObserver, UserHandle.USER_ALL);
@@ -1809,6 +1817,20 @@ public final class PowerManagerService extends SystemService
         float kbdBrightOverride = Settings.Secure.getFloatForUser(resolver,
                 "keyboard_brightness", -1.0f, UserHandle.USER_CURRENT);
         if (kbdBrightOverride >= 0) mKeyboardBrightness = kbdBrightOverride;
+
+        mKeyboardAdaptiveBrightness = Settings.Secure.getIntForUser(resolver,
+                "keyboard_adaptive_brightness", 1, UserHandle.USER_CURRENT) == 1;
+        int highBrightnessOff = Settings.Secure.getIntForUser(resolver,
+                "keyboard_backlight_high_brightness_off", -1, UserHandle.USER_CURRENT);
+        if (highBrightnessOff == -1) {
+            // Preserve the old combined behavior once per user, then keep the
+            // cutoff independent of subsequent changes to adaptive brightness.
+            highBrightnessOff = mKeyboardAdaptiveBrightness ? 1 : 0;
+            Settings.Secure.putIntForUser(resolver,
+                    "keyboard_backlight_high_brightness_off", highBrightnessOff,
+                    UserHandle.USER_CURRENT);
+        }
+        mKeyboardBacklightHighBrightnessOff = highBrightnessOff == 1;
 
         mForceNavbar = LineageSettings.System.getIntForUser(resolver,
                 LineageSettings.System.FORCE_SHOW_NAVBAR,
@@ -3302,7 +3324,7 @@ public final class PowerManagerService extends SystemService
                             float buttonBrightScale = 1.0f;
                             float keyboardBrightScale = 1.0f;
                             boolean adaptiveButtonBrightness = true;
-                            boolean adaptiveKeyboardBrightness = true;
+                            boolean keyboardOffForHighBrightness = false;
                             try {
                                 int screenBrightInt = Settings.System.getIntForUser(
                                         mContext.getContentResolver(),
@@ -3315,14 +3337,10 @@ public final class PowerManagerService extends SystemService
                                         "button_adaptive_brightness", 1, 
                                         UserHandle.USER_CURRENT) == 1;                                
                                 buttonBrightScale = Math.max(0.01f, screenBrightInt / 255.0f);
-                                // Keyboard Scale
-                                adaptiveKeyboardBrightness = Settings.Secure.getIntForUser(
-                                        mContext.getContentResolver(),
-                                        "keyboard_adaptive_brightness", 1, 
-                                        UserHandle.USER_CURRENT) == 1;
+                                // Calculate scaling independently of the cutoff.
                                 if (screenBrightInt <= 0) {
                                     keyboardBrightScale = 0.0f;
-                                } else if (screenBrightInt < 100) {
+                                } else {
                                     // Smooth scaling curve for keyboard backlight
                                     // 10% floor for Athena, 70% floor for Luna (Luna has dimmer backlight)
                                     float minKbScale = isLunaDevice() ? 0.7f : 0.1f;
@@ -3330,13 +3348,14 @@ public final class PowerManagerService extends SystemService
                                         minKbScale + ((1.0f - minKbScale) * (screenBrightInt / 255.0f));
                                     keyboardBrightScale = 
                                         Math.max(minKbScale, Math.min(1.0f, keyboardBrightScale));
-                                } else {
-                                    // Bright (daylight): kbd off
-                                    keyboardBrightScale = 0.0f;
                                 }
+                                keyboardOffForHighBrightness =
+                                        mKeyboardBacklightHighBrightnessOff
+                                        && screenBrightInt >= 100;
                             } catch (Exception e) {
                                 buttonBrightScale = 1.0f;
                                 keyboardBrightScale = 1.0f;
+                                keyboardOffForHighBrightness = false;
                             }
 
                             if (mButtonsLight != null) {
@@ -3407,10 +3426,13 @@ public final class PowerManagerService extends SystemService
                                 } else if (isValidKeyboardBrightness(mKeyboardBrightness)) {
                                     keyboardBrightness = mKeyboardBrightness;
                                 }
-                                // Scale keyboard brightness with screen brightness (off in daylight)
-                                // ONLY if toggle is enabled
-                                if (keyboardBrightness > BRIGHTNESS_OFF_FLOAT && adaptiveKeyboardBrightness) {
+                                // Scaling and high-brightness cutoff are independent.
+                                if (keyboardBrightness > BRIGHTNESS_OFF_FLOAT
+                                        && mKeyboardAdaptiveBrightness) {
                                     keyboardBrightness *= keyboardBrightScale;
+                                }
+                                if (keyboardOffForHighBrightness) {
+                                    keyboardBrightness = BRIGHTNESS_OFF_FLOAT;
                                 }
 
                                 if (!mKeyboardLightOnKeypressOnly) {
