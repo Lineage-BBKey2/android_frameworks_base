@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Toast shown when the Cast tile requests Wi-Fi activation. -->
+    <string name="quick_settings_cast_turning_on_wifi">Turning on Wi-Fi…</string>
+</resources>

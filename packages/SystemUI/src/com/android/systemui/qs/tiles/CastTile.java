@@ -34,6 +34,7 @@ import android.widget.Button;
 
 import androidx.annotation.Nullable;
 
+import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.app.MediaRouteDialogPresenter;
 import com.android.internal.jank.InteractionJankMonitor;
 import com.android.internal.logging.MetricsLogger;
@@ -80,6 +81,8 @@ public class CastTile extends QSTileImpl<BooleanState> {
 
     private static final String INTERACTION_JANK_TAG = TILE_SPEC;
 
+    private static final long WIFI_ENABLE_TIMEOUT_MS = 10_000;
+
     private static final Intent CAST_SETTINGS =
             new Intent(Settings.ACTION_CAST_SETTINGS);
 
@@ -90,9 +93,15 @@ public class CastTile extends QSTileImpl<BooleanState> {
     private final Callback mCallback = new Callback();
     private final TileJavaAdapter mJavaAdapter;
     private final FeatureFlags mFeatureFlags;
+    private final CastWifiStartupPopup mWifiStartupPopup;
     private boolean mCastTransportAllowed;
     private boolean mWifiEnabled;
     private boolean mHotspotEnabled;
+    private boolean mWifiEnabling;
+    private final Runnable mWifiEnableTimeout = () -> {
+        mWifiEnabling = false;
+        refreshState();
+    };
 
     @Inject
     public CastTile(
@@ -123,6 +132,7 @@ public class CastTile extends QSTileImpl<BooleanState> {
         mDialogTransitionAnimator = dialogTransitionAnimator;
         mJavaAdapter = javaAdapter;
         mFeatureFlags = featureFlags;
+        mWifiStartupPopup = new CastWifiStartupPopup(mContext, mUiHandler);
         mController.observe(this, mCallback);
         mKeyguard.observe(this, mCallback);
         if (!mFeatureFlags.isEnabled(SIGNAL_CALLBACK_DEPRECATION)) {
@@ -158,7 +168,14 @@ public class CastTile extends QSTileImpl<BooleanState> {
     @Override
     protected void handleUserSwitch(int newUserId) {
         super.handleUserSwitch(newUserId);
+        mUiHandler.post(mWifiStartupPopup::hide);
         mController.setCurrentUserId(newUserId);
+    }
+
+    @Override
+    protected void handleDestroy() {
+        mUiHandler.post(mWifiStartupPopup::destroy);
+        super.handleDestroy();
     }
 
     @Override
@@ -180,17 +197,43 @@ public class CastTile extends QSTileImpl<BooleanState> {
         List<CastDevice> activeDevices = getActiveDevices();
         if (willPopDialog()) {
             if (!mKeyguard.isShowing()) {
+                enableWifiIfNeeded();
                 showDialog(expandable);
             } else {
                 mActivityStarter.postQSRunnableDismissingKeyguard(() -> {
                     // Dismissing the keyguard will collapse the shade, so we don't animate from the
                     // view here as it would not look good.
-                    showDialog(null /* view */);
+                    mHandler.post(() -> {
+                        enableWifiIfNeeded();
+                        showDialog(null /* view */);
+                    });
                 });
             }
         } else {
             mController.stopCasting(activeDevices.get(0), StopReason.STOP_QS_TILE);
         }
+    }
+
+    @VisibleForTesting
+    void enableWifiIfNeeded() {
+        // Keep existing Ethernet and hotspot casting paths without changing the Wi-Fi radio.
+        if (canCastToNetwork() || mWifiEnabling) {
+            return;
+        }
+        mWifiEnabling = true;
+        refreshState();
+        // Allow another request if this one is rejected or Wi-Fi fails to start.
+        mHandler.postDelayed(mWifiEnableTimeout, WIFI_ENABLE_TIMEOUT_MS);
+        mNetworkController.setWifiEnabled(true);
+        // Show above the shade and Cast dialog; an ordinary TYPE_TOAST window sits below them.
+        mUiHandler.post(this::showWifiEnablingToast);
+        // The chooser keeps its active scan registered while Wi-Fi starts. Respect the
+        // existing WIFI_DISPLAY_ON setting; enabling the radio must not change that setting.
+    }
+
+    @VisibleForTesting
+    void showWifiEnablingToast() {
+        mWifiStartupPopup.show(R.string.quick_settings_cast_turning_on_wifi);
     }
 
     // We want to pop up the media route selection dialog if we either have no active devices
@@ -298,19 +341,14 @@ public class CastTile extends QSTileImpl<BooleanState> {
         }
         state.icon = maybeLoadResourceIcon(state.value
                 ? R.drawable.ic_cast_connected : R.drawable.ic_cast);
-        if (canCastToNetwork() || state.value) {
-            state.state = state.value ? Tile.STATE_ACTIVE : Tile.STATE_INACTIVE;
-            if (!state.value) {
-                state.secondaryLabel = "";
-            }
-            state.expandedAccessibilityClassName = Button.class.getName();
-            state.forceExpandIcon = willPopDialog();
-        } else {
-            state.state = Tile.STATE_UNAVAILABLE;
-            String noWifi = mContext.getString(R.string.quick_settings_cast_no_network);
-            state.secondaryLabel = noWifi;
-            state.forceExpandIcon = false;
+        // An idle tile must remain clickable so it can turn on Wi-Fi on demand.
+        state.state = state.value ? Tile.STATE_ACTIVE : Tile.STATE_INACTIVE;
+        state.isTransient = mWifiEnabling && !state.value;
+        if (!state.value && !connecting) {
+            state.secondaryLabel = "";
         }
+        state.expandedAccessibilityClassName = Button.class.getName();
+        state.forceExpandIcon = willPopDialog();
         state.stateDescription = state.stateDescription + ", " + state.secondaryLabel;
     }
 
@@ -329,8 +367,14 @@ public class CastTile extends QSTileImpl<BooleanState> {
     }
 
     private void setWifiEnabled(boolean enabled) {
-        if (enabled != mWifiEnabled) {
-            mWifiEnabled = enabled;
+        boolean changed = enabled != mWifiEnabled;
+        mWifiEnabled = enabled;
+        if (enabled && mWifiEnabling) {
+            mWifiEnabling = false;
+            mHandler.removeCallbacks(mWifiEnableTimeout);
+            changed = true;
+        }
+        if (changed) {
             refreshState();
         }
     }
@@ -365,6 +409,7 @@ public class CastTile extends QSTileImpl<BooleanState> {
     private final SignalCallback mSignalCallback = new SignalCallback() {
         @Override
         public void setWifiIndicators(@NonNull WifiIndicators indicators) {
+            setWifiEnabled(indicators.enabled);
             setCastTransportAllowed(indicators.enabled);
         }
     };

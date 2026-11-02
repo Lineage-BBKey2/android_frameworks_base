@@ -24,6 +24,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.same;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -112,6 +113,7 @@ public class CastTileTest extends SysuiTestCase {
 
     private TestableLooper mTestableLooper;
     private CastTile mCastTile;
+    private int mWifiToastCount;
 
     @Before
     public void setUp() throws Exception {
@@ -130,7 +132,7 @@ public class CastTileTest extends SysuiTestCase {
     // -------------------------------------------------
     // All these tests for enabled/disabled wifi have hotspot not enabled
     @Test
-    public void testStateUnavailable_wifiDisabled() {
+    public void testStateInactive_wifiDisabled() {
         createAndStartTileOldImpl();
         IconState qsIcon = new IconState(false, 0, "");
         WifiIndicators indicators = new WifiIndicators(
@@ -140,11 +142,11 @@ public class CastTileTest extends SysuiTestCase {
         mSignalCallback.setWifiIndicators(indicators);
         mTestableLooper.processAllMessages();
 
-        assertEquals(Tile.STATE_UNAVAILABLE, mCastTile.getState().state);
+        assertEquals(Tile.STATE_INACTIVE, mCastTile.getState().state);
     }
 
     @Test
-    public void testStateUnavailable_wifiNotConnected() {
+    public void testStateInactive_wifiNotConnected() {
         createAndStartTileOldImpl();
         IconState qsIcon = new IconState(false, 0, "");
         WifiIndicators indicators = new WifiIndicators(
@@ -154,7 +156,7 @@ public class CastTileTest extends SysuiTestCase {
         mSignalCallback.setWifiIndicators(indicators);
         mTestableLooper.processAllMessages();
 
-        assertEquals(Tile.STATE_UNAVAILABLE, mCastTile.getState().state);
+        assertEquals(Tile.STATE_INACTIVE, mCastTile.getState().state);
     }
 
     private void enableWifiAndProcessMessages() {
@@ -192,20 +194,20 @@ public class CastTileTest extends SysuiTestCase {
     // SIGNAL_CALLBACK_DEPRECATION flag set to true
 
     @Test
-    public void stateUnavailable_noDefaultNetworks_newPipeline() {
+    public void stateInactive_noDefaultNetworks_newPipeline() {
         createAndStartTileNewImpl();
         mTestableLooper.processAllMessages();
 
-        assertEquals(Tile.STATE_UNAVAILABLE, mCastTile.getState().state);
+        assertEquals(Tile.STATE_INACTIVE, mCastTile.getState().state);
     }
 
     @Test
-    public void stateUnavailable_mobileConnected_newPipeline() {
+    public void stateInactive_mobileConnected_newPipeline() {
         createAndStartTileNewImpl();
         mConnectivityRepository.setMobileConnected(true);
         mTestableLooper.processAllMessages();
 
-        assertEquals(Tile.STATE_UNAVAILABLE, mCastTile.getState().state);
+        assertEquals(Tile.STATE_INACTIVE, mCastTile.getState().state);
     }
 
     @Test
@@ -261,21 +263,21 @@ public class CastTileTest extends SysuiTestCase {
     // -------------------------------------------------
     // All these tests for enabled/disabled hotspot have wifi not enabled
     @Test
-    public void testStateUnavailable_hotspotDisabled() {
+    public void testStateInactive_hotspotDisabled() {
         createAndStartTileOldImpl();
         mHotspotCallback.onHotspotChanged(false, 0);
         mTestableLooper.processAllMessages();
 
-        assertEquals(Tile.STATE_UNAVAILABLE, mCastTile.getState().state);
+        assertEquals(Tile.STATE_INACTIVE, mCastTile.getState().state);
     }
 
     @Test
-    public void testStateUnavailable_hotspotEnabledNotConnected() {
+    public void testStateInactive_hotspotEnabledNotConnected() {
         createAndStartTileOldImpl();
         mHotspotCallback.onHotspotChanged(true, 0);
         mTestableLooper.processAllMessages();
 
-        assertEquals(Tile.STATE_UNAVAILABLE, mCastTile.getState().state);
+        assertEquals(Tile.STATE_INACTIVE, mCastTile.getState().state);
     }
 
     @Test
@@ -299,6 +301,130 @@ public class CastTileTest extends SysuiTestCase {
         assertEquals(Tile.STATE_INACTIVE, mCastTile.getState().state);
     }
     // -------------------------------------------------
+
+    @Test
+    public void enableWifiIfNeeded_wifiOff_showsToastOnceWithoutTileSubtitle() {
+        createAndStartTileNewImpl();
+
+        mCastTile.enableWifiIfNeeded();
+        mCastTile.enableWifiIfNeeded();
+        mTestableLooper.processAllMessages();
+
+        verify(mNetworkController, times(1)).setWifiEnabled(true);
+        assertEquals(Tile.STATE_INACTIVE, mCastTile.getState().state);
+        assertTrue(mCastTile.getState().isTransient);
+        assertEquals(1, mWifiToastCount);
+        assertEquals("", mCastTile.getState().secondaryLabel);
+    }
+
+    @Test
+    public void enableWifiIfNeeded_wifiEnabled_clearsPendingState_newPipeline() {
+        createAndStartTileNewImpl();
+        mCastTile.enableWifiIfNeeded();
+        mTestableLooper.processAllMessages();
+        assertTrue(mCastTile.getState().isTransient);
+
+        mWifiRepository.setIsWifiEnabled(true);
+        mTestableLooper.processAllMessages();
+
+        assertFalse(mCastTile.getState().isTransient);
+        assertEquals("", mCastTile.getState().secondaryLabel);
+        assertEquals(Tile.STATE_INACTIVE, mCastTile.getState().state);
+        assertEquals(1, mWifiToastCount);
+    }
+
+    @Test
+    public void enableWifiIfNeeded_wifiEnabled_clearsPendingState_oldPipeline() {
+        createAndStartTileOldImpl();
+        mCastTile.enableWifiIfNeeded();
+        mTestableLooper.processAllMessages();
+        assertTrue(mCastTile.getState().isTransient);
+
+        enableWifiAndProcessMessages();
+
+        assertFalse(mCastTile.getState().isTransient);
+        assertEquals("", mCastTile.getState().secondaryLabel);
+    }
+
+    @Test
+    public void enableWifiIfNeeded_timeout_allowsRetryWithAnotherToast() {
+        createAndStartTileNewImpl();
+        mCastTile.enableWifiIfNeeded();
+        mTestableLooper.processAllMessages();
+        assertTrue(mCastTile.getState().isTransient);
+
+        mTestableLooper.moveTimeForward(10_000);
+        mTestableLooper.processAllMessages();
+
+        assertFalse(mCastTile.getState().isTransient);
+        assertEquals("", mCastTile.getState().secondaryLabel);
+        mCastTile.enableWifiIfNeeded();
+        mTestableLooper.processAllMessages();
+        verify(mNetworkController, times(2)).setWifiEnabled(true);
+        assertEquals(2, mWifiToastCount);
+    }
+
+    @Test
+    public void enableWifiIfNeeded_wifiAlreadyOn_doesNotEnableAgain() {
+        createAndStartTileNewImpl();
+        mWifiRepository.setIsWifiEnabled(true);
+        mTestableLooper.processAllMessages();
+
+        mCastTile.enableWifiIfNeeded();
+
+        verify(mNetworkController, never()).setWifiEnabled(true);
+        assertFalse(mCastTile.getState().isTransient);
+        assertEquals(0, mWifiToastCount);
+    }
+
+    @Test
+    public void enableWifiIfNeeded_ethernetAvailable_doesNotEnableWifi() {
+        createAndStartTileNewImpl();
+        mConnectivityRepository.setEthernetConnected(true);
+        mTestableLooper.processAllMessages();
+
+        mCastTile.enableWifiIfNeeded();
+
+        verify(mNetworkController, never()).setWifiEnabled(true);
+    }
+
+    @Test
+    public void enableWifiIfNeeded_hotspotAvailable_doesNotEnableWifi() {
+        createAndStartTileNewImpl();
+        mHotspotCallback.onHotspotChanged(true, 0);
+        mTestableLooper.processAllMessages();
+
+        mCastTile.enableWifiIfNeeded();
+
+        verify(mNetworkController, never()).setWifiEnabled(true);
+    }
+
+    @Test
+    public void handleClick_locked_doesNotEnableWifiBeforeUnlock() {
+        createAndStartTileNewImpl();
+        when(mKeyguard.isShowing()).thenReturn(true);
+
+        mCastTile.handleClick(null);
+        mTestableLooper.processAllMessages();
+
+        verify(mActivityStarter).postQSRunnableDismissingKeyguard(any());
+        verify(mNetworkController, never()).setWifiEnabled(true);
+    }
+
+    @Test
+    public void handleClick_projectionOnly_wifiOff_stopsWithoutEnablingWifi() {
+        createAndStartTileNewImpl();
+        CastDevice device = new CastDevice(
+                "id", null, null, CastDevice.CastState.Connected,
+                CastDevice.CastOrigin.MediaProjection, mock(MediaProjectionInfo.class));
+        when(mController.getCastDevices()).thenReturn(List.of(device));
+
+        mCastTile.handleClick(null);
+        mTestableLooper.processAllMessages();
+
+        verify(mController).stopCasting(same(device), eq(StopReason.STOP_QS_TILE));
+        verify(mNetworkController, never()).setWifiEnabled(true);
+    }
 
     @Test
     public void testHandleClick_castDevicePresent() {
@@ -431,7 +557,7 @@ public class CastTileTest extends SysuiTestCase {
         mCastTile.refreshState();
         mTestableLooper.processAllMessages();
 
-        assertFalse(mCastTile.getState().forceExpandIcon);
+        assertTrue(mCastTile.getState().forceExpandIcon);
     }
 
     @Test
@@ -539,7 +665,12 @@ public class CastTileTest extends SysuiTestCase {
                 mWifiRepository,
                 mJavaAdapter,
                 mFeatureFlags
-        );
+        ) {
+            @Override
+            void showWifiEnablingToast() {
+                mWifiToastCount++;
+            }
+        };
         mCastTile.initialize();
 
         // We are not setting the mocks to listening, so we trigger a first refresh state to
@@ -583,7 +714,12 @@ public class CastTileTest extends SysuiTestCase {
                 mWifiRepository,
                 mJavaAdapter,
                 mFeatureFlags
-        );
+        ) {
+            @Override
+            void showWifiEnablingToast() {
+                mWifiToastCount++;
+            }
+        };
         mCastTile.initialize();
 
         // Since we do not capture the callbacks like in the old impl, set the state to RESUMED
